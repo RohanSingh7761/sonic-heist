@@ -27,6 +27,11 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: true
+    allowedHosts: [
+      '.loca.lt',
+      'seven-gifts-cough.loca.lt',
+      'localhost',
+      '127.0.0.1'
+    ]
   }
 });
