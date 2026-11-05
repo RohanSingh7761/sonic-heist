@@ -1,0 +1,8 @@
+{
+  "name": "sonicpay-root",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/web run build"
+  }
+}
