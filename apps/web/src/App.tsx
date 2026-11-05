@@ -40,11 +40,46 @@ export default function App() {
 
   // Payloads
   const [mockPayment, setMockPayment] = useState<PaymentData>(createMockPayment());
+  const [usdcAmountInput, setUsdcAmountInput] = useState<string>('1.0');
+  const [feeInput, setFeeInput] = useState<string>('0.01');
   const [receivedPayments, setReceivedPayments] = useState<{ timestamp: string; data: PaymentData; rawHex: string }[]>([]);
   const [receivedAcks, setReceivedAcks] = useState<{ timestamp: string; data: AckData }[]>([]);
   const [logs, setLogs] = useState<{ time: string; msg: string; type: 'info' | 'success' | 'warn' | 'error' }[]>([]);
 
   const packedPaymentBytes = React.useMemo(() => packPayment(mockPayment), [mockPayment]);
+
+  const handleAmountChange = (valStr: string) => {
+    setUsdcAmountInput(valStr);
+    const parsed = parseFloat(valStr);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setMockPayment((prev) => ({
+        ...prev,
+        amount: BigInt(Math.round(parsed * 1e6)),
+      }));
+    }
+  };
+
+  const handleFeeChange = (valStr: string) => {
+    setFeeInput(valStr);
+    const parsed = parseFloat(valStr);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setMockPayment((prev) => ({
+        ...prev,
+        fee: Math.round(parsed * 1e6),
+      }));
+    }
+  };
+
+  const handleRandomizeUid = () => {
+    const newUid = Math.floor(Math.random() * 0xffff) + 1;
+    const newSalt = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
+    setMockPayment((prev) => ({
+      ...prev,
+      uid: newUid,
+      salt: newSalt,
+    }));
+    addLog(`Generated new payment UID: 0x${newUid.toString(16).toUpperCase()}`, 'info');
+  };
 
   // Online / Offline listener
   useEffect(() => {
@@ -284,25 +319,97 @@ export default function App() {
                 <span className="text-slate-500 block mb-1">Receiver (Bob)</span>
                 <span className="text-slate-200 break-all">{mockPayment.receiver}</span>
               </div>
+              {/* Editable Amount */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-slate-400 font-medium">Payment Amount (USDC)</label>
+                  <span className="text-[11px] text-emerald-400 font-semibold">
+                    {(Number(mockPayment.amount) / 1e6).toFixed(6)} USDC
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.000001"
+                  value={usdcAmountInput}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                  placeholder="e.g. 5.0"
+                />
+                <div className="flex gap-1.5 mt-2">
+                  {['0.5', '1.0', '5.0', '25.0'].map((preset) => (
+                    <button
+                      key={preset}
+                      onClick={() => handleAmountChange(preset)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all ${
+                        usdcAmountInput === preset
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Editable Relayer Fee */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-slate-400 font-medium">Relayer Fee (USDC)</label>
+                  <span className="text-[11px] text-indigo-400 font-semibold">
+                    {(mockPayment.fee / 1e6).toFixed(6)} USDC
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  step="0.005"
+                  min="0"
+                  value={feeInput}
+                  onChange={(e) => handleFeeChange(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-indigo-400 font-mono font-bold focus:outline-none focus:border-indigo-500"
+                  placeholder="e.g. 0.01"
+                />
+                <div className="flex gap-1.5 mt-2">
+                  {['0.005', '0.01', '0.02', '0.05'].map((preset) => (
+                    <button
+                      key={preset}
+                      onClick={() => handleFeeChange(preset)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all ${
+                        feeInput === preset
+                          ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* UID with Randomizer */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
+                <div>
+                  <span className="text-slate-500 block mb-1">UID (16-bit match tag)</span>
+                  <span className="text-amber-300 font-bold text-sm">
+                    0x{mockPayment.uid.toString(16).toUpperCase()}
+                  </span>
+                </div>
+                <button
+                  onClick={handleRandomizeUid}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-[11px] flex items-center gap-1 font-sans transition-all"
+                >
+                  <RotateCcw className="w-3 h-3 text-amber-400" />
+                  <span>Randomize</span>
+                </button>
+              </div>
+
+              {/* Total Signed Value */}
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-500 block mb-1">Amount</span>
-                <span className="text-emerald-400 font-semibold text-sm">
-                  {(Number(mockPayment.amount) / 1e6).toFixed(6)} USDC
+                <span className="text-slate-500 block mb-1">Total Authorization Value (Amount + Fee)</span>
+                <span className="text-slate-200 font-bold text-sm">
+                  {((Number(mockPayment.amount) + mockPayment.fee) / 1e6).toFixed(6)} USDC
                 </span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-500 block mb-1">Relayer Fee</span>
-                <span className="text-indigo-400 font-semibold text-sm">
-                  {(mockPayment.fee / 1e6).toFixed(6)} USDC
-                </span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-500 block mb-1">UID (16-bit match tag)</span>
-                <span className="text-amber-300">0x{mockPayment.uid.toString(16).toUpperCase()}</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-500 block mb-1">Target Chain</span>
-                <span className="text-slate-200">Sepolia (Index: {mockPayment.chainIndex})</span>
               </div>
             </div>
 
