@@ -1,6 +1,5 @@
 // GGWave Modem wrapper for Web Audio API transmission & reception
 
-// Helper to convert between TypedArray representations without reallocation
 function convertTypedArray(src: any, type: any) {
   const buffer = new ArrayBuffer(src.byteLength);
   new src.constructor(buffer).set(src);
@@ -24,63 +23,71 @@ export class GgwaveModem {
   private isListening = false;
   private isTransmitting = false;
 
-  public availableProtocols: GgwaveProtocol[] = [];
-  public defaultProtocolId = 1; // Default Audible Fast
+  public availableProtocols: GgwaveProtocol[] = [
+    { id: 1, name: 'Audible Fast (Recommended)', isUltrasonic: false },
+    { id: 2, name: 'Audible Fastest', isUltrasonic: false },
+    { id: 0, name: 'Audible Normal', isUltrasonic: false },
+    { id: 4, name: 'Ultrasonic Fast (Quiet)', isUltrasonic: true },
+  ];
+  public defaultProtocolId = 1;
 
-  async init(): Promise<void> {
-    if (this.instance) return;
+  // Load WASM and ggwave library (does NOT touch AudioContext yet to avoid iOS restrictions)
+  async loadLibrary(): Promise<void> {
+    if (this.ggwave) return;
 
-    // Dynamically load ggwave factory
-    const ggwaveModule = await import('ggwave');
-    this.factory = (ggwaveModule as any).default || ggwaveModule;
-
-    this.ggwave = await this.factory();
-
-    // Lazy create AudioContext on user gesture or init
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    this.audioContext = new AudioContextClass();
-
-    const parameters = this.ggwave.getDefaultParameters();
-    parameters.sampleRateInp = this.audioContext.sampleRate;
-    parameters.sampleRateOut = this.audioContext.sampleRate;
-
-    this.instance = this.ggwave.init(parameters);
-
-    // Populate protocols
-    const pIds = this.ggwave.ProtocolId || this.ggwave.TxProtocolId || {};
-    this.availableProtocols = [
-      { id: pIds.GGWAVE_PROTOCOL_AUDIBLE_FAST ?? 1, name: 'Audible Fast (Recommended)', isUltrasonic: false },
-      { id: pIds.GGWAVE_PROTOCOL_AUDIBLE_FASTEST ?? 2, name: 'Audible Fastest', isUltrasonic: false },
-      { id: pIds.GGWAVE_PROTOCOL_AUDIBLE_NORMAL ?? 0, name: 'Audible Normal', isUltrasonic: false },
-      { id: pIds.GGWAVE_PROTOCOL_ULTRASONIC_FAST ?? 4, name: 'Ultrasonic Fast (Quiet)', isUltrasonic: true },
-    ];
-    this.defaultProtocolId = this.availableProtocols[0].id;
+    try {
+      const ggwaveModule = await import('ggwave');
+      this.factory = (ggwaveModule as any).default || ggwaveModule;
+      this.ggwave = await this.factory();
+    } catch (err: any) {
+      console.error('Failed to load ggwave module:', err);
+      throw new Error(`Failed to load ggwave WebAssembly: ${err.message}`);
+    }
   }
 
-  getAudioContext(): AudioContext {
+  // Ensure AudioContext is created and resumed on user gesture
+  ensureAudioContext(): AudioContext {
     if (!this.audioContext) {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) {
+        throw new Error('Web Audio API is not supported on this browser.');
+      }
       this.audioContext = new AudioContextClass();
     }
+
     if (this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
+      this.audioContext.resume().catch((e) => console.warn('AudioContext resume error:', e));
     }
+
+    // Initialize or re-initialize ggwave instance with the exact context sample rate
+    if (!this.instance && this.ggwave) {
+      const parameters = this.ggwave.getDefaultParameters();
+      parameters.sampleRateInp = this.audioContext.sampleRate;
+      parameters.sampleRateOut = this.audioContext.sampleRate;
+      this.instance = this.ggwave.init(parameters);
+    }
+
     return this.audioContext;
   }
 
   // Play audio payload through speakers
   async transmit(
     payload: Uint8Array,
-    protocolId?: number,
-    volume: number = 25
+    protocolId: number = 1,
+    volume: number = 30
   ): Promise<{ durationMs: number }> {
-    await this.init();
-    const ctx = this.getAudioContext();
+    await this.loadLibrary();
+    const ctx = this.ensureAudioContext();
 
-    const proto = protocolId !== undefined ? protocolId : this.defaultProtocolId;
+    if (!this.instance) {
+      const parameters = this.ggwave.getDefaultParameters();
+      parameters.sampleRateInp = ctx.sampleRate;
+      parameters.sampleRateOut = ctx.sampleRate;
+      this.instance = this.ggwave.init(parameters);
+    }
 
     // Encode payload into audio waveform
-    const waveform = this.ggwave.encode(this.instance, payload, proto, volume);
+    const waveform = this.ggwave.encode(this.instance, payload, protocolId, volume);
     if (!waveform || waveform.length === 0) {
       throw new Error('Failed to encode audio waveform: ggwave returned empty buffer');
     }
@@ -111,8 +118,12 @@ export class GgwaveModem {
     onAudioLevel?: (level: number) => void
   ): Promise<void> {
     if (this.isListening) return;
-    await this.init();
-    const ctx = this.getAudioContext();
+    await this.loadLibrary();
+    const ctx = this.ensureAudioContext();
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Microphone access requires HTTPS or localhost and a supported browser.');
+    }
 
     this.mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -128,11 +139,11 @@ export class GgwaveModem {
     this.scriptProcessor = ctx.createScriptProcessor(bufferSize, 1, 1);
 
     this.scriptProcessor.onaudioprocess = (e) => {
-      if (this.isTransmitting) return; // Half-duplex: ignore microphone while transmitting
+      if (this.isTransmitting) return; // Half-duplex guard
 
       const inputBuffer = e.inputBuffer.getChannelData(0);
 
-      // Calculate audio power level for visualizer
+      // Audio activity indicator
       if (onAudioLevel) {
         let sum = 0;
         for (let i = 0; i < inputBuffer.length; i++) {
@@ -142,7 +153,7 @@ export class GgwaveModem {
         onAudioLevel(Math.min(1, rms * 5));
       }
 
-      // Pass audio samples to ggwave decoder
+      // Feed PCM samples into ggwave decoder
       const int8Samples = convertTypedArray(new Float32Array(inputBuffer), Int8Array);
       const res = this.ggwave.decode(this.instance, int8Samples);
 
@@ -186,5 +197,4 @@ export class GgwaveModem {
   }
 }
 
-// Global singleton instance for the app
 export const modem = new GgwaveModem();

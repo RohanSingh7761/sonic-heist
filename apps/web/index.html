@@ -2,7 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f172a" />
     <meta name="description" content="SonicPay: Offline Crypto Payments Over Sound" />
@@ -10,6 +9,24 @@
   </head>
   <body class="bg-slate-950 text-slate-100 min-h-screen">
     <div id="root"></div>
+
+    <!-- On-screen error overlay for mobile debugging -->
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        var div = document.createElement('div');
+        div.style = 'position:fixed;top:0;left:0;right:0;padding:16px;background:#991b1b;color:#fff;font-family:monospace;font-size:12px;z-index:99999;word-break:break-all;white-space:pre-wrap;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+        div.innerHTML = '<b style="font-size:14px">⚠️ Client Error:</b>\n' + msg + '\n<small>' + (url || '') + ':' + line + ':' + col + '</small>\n\n' + (error && error.stack ? error.stack : '');
+        document.body.appendChild(div);
+      };
+      window.onunhandledrejection = function(event) {
+        var reason = event.reason || 'Unknown error';
+        var div = document.createElement('div');
+        div.style = 'position:fixed;top:0;left:0;right:0;padding:16px;background:#991b1b;color:#fff;font-family:monospace;font-size:12px;z-index:99999;word-break:break-all;white-space:pre-wrap;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+        div.innerHTML = '<b style="font-size:14px">⚠️ Promise Rejection:</b>\n' + (reason.message || reason) + '\n\n' + (reason.stack || '');
+        document.body.appendChild(div);
+      };
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -60,10 +60,10 @@ export default function App() {
 
   // Initialize modem & protocols on mount
   useEffect(() => {
-    modem.init().then(() => {
+    modem.loadLibrary().then(() => {
       setProtocols(modem.availableProtocols);
       setSelectedProtocol(modem.defaultProtocolId);
-      addLog('Audio modem initialized successfully.', 'info');
+      addLog('Audio modem library loaded.', 'info');
     }).catch((err) => {
       addLog(`Initialization error: ${err.message}`, 'error');
     });
