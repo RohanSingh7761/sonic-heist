@@ -15,6 +15,7 @@ export interface GgwaveProtocol {
 export class GgwaveModem {
   private factory: any = null;
   private ggwave: any = null;
+  private loading: Promise<void> | null = null;
   private instance: any = null;
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
@@ -35,17 +36,20 @@ export class GgwaveModem {
   public defaultProtocolId = 4; // Default to Ultrasound Fast (~16.2 kHz, Inaudible)
 
   // Load WASM and ggwave library (does NOT touch AudioContext yet to avoid iOS restrictions)
-  async loadLibrary(): Promise<void> {
-    if (this.ggwave) return;
-
-    try {
-      const ggwaveModule = await import('ggwave');
-      this.factory = (ggwaveModule as any).default || ggwaveModule;
-      this.ggwave = await this.factory();
-    } catch (err: any) {
-      console.error('Failed to load ggwave module:', err);
-      throw new Error(`Failed to load ggwave WebAssembly: ${err.message}`);
-    }
+  loadLibrary(): Promise<void> {
+    // Overlapping loads would each make a ggwave copy, and an instance id from one copy aborts encode in another.
+    this.loading ??= (async () => {
+      try {
+        const ggwaveModule = await import('ggwave');
+        this.factory = (ggwaveModule as any).default || ggwaveModule;
+        this.ggwave = await this.factory();
+      } catch (err: any) {
+        this.loading = null; // Let the next call retry, e.g. after a network blip
+        console.error('Failed to load ggwave module:', err);
+        throw new Error(`Failed to load ggwave WebAssembly: ${err.message}`);
+      }
+    })();
+    return this.loading;
   }
 
   // Ensure AudioContext is created and resumed on user gesture
@@ -62,8 +66,8 @@ export class GgwaveModem {
       this.audioContext.resume().catch((e) => console.warn('AudioContext resume error:', e));
     }
 
-    // Initialize or re-initialize ggwave instance with the exact context sample rate
-    if (!this.instance && this.ggwave) {
+    // Initialize ggwave instance with the exact context sample rate (0 is a valid instance id)
+    if (this.instance === null && this.ggwave) {
       const parameters = this.ggwave.getDefaultParameters();
       parameters.sampleRateInp = this.audioContext.sampleRate;
       parameters.sampleRateOut = this.audioContext.sampleRate;
@@ -81,13 +85,6 @@ export class GgwaveModem {
   ): Promise<{ durationMs: number }> {
     await this.loadLibrary();
     const ctx = this.ensureAudioContext();
-
-    if (!this.instance && this.ggwave) {
-      const parameters = this.ggwave.getDefaultParameters();
-      parameters.sampleRateInp = ctx.sampleRate;
-      parameters.sampleRateOut = ctx.sampleRate;
-      this.instance = this.ggwave.init(parameters);
-    }
 
     // Resolve proper Emscripten enum object (ggwave requires the enum instance, not a raw JS number)
     const protoObj =
@@ -146,13 +143,6 @@ export class GgwaveModem {
     await this.loadLibrary();
     const ctx = this.ensureAudioContext();
 
-    if (!this.instance && this.ggwave) {
-      const parameters = this.ggwave.getDefaultParameters();
-      parameters.sampleRateInp = ctx.sampleRate;
-      parameters.sampleRateOut = ctx.sampleRate;
-      this.instance = this.ggwave.init(parameters);
-    }
-
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error('Microphone access requires HTTPS or localhost and a supported browser.');
     }
@@ -201,7 +191,7 @@ export class GgwaveModem {
       // Feed PCM samples into ggwave decoder
       const int8Samples = convertTypedArray(new Float32Array(inputBuffer), Int8Array);
       // Ensure instance sample rate matches context sample rate
-      if (this.instance && this.ggwave) {
+      if (this.instance !== null && this.ggwave) {
         const res = this.ggwave.decode(this.instance, int8Samples);
         if (res && res.length > 0) {
           const decoded = new Uint8Array(res);
