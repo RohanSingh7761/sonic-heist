@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Sonic Heist",
+    "slug": "sonic-heist",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#2b2036",
+    "android": {
+      "package": "com.sonicheist",
+      "adaptiveIcon": {
+        "backgroundColor": "#2b2036",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "plugins": [
+      "expo-audio",
+      "expo-font",
+      "expo-asset"
+    ]
+  }
+}

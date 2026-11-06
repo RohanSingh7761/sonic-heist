@@ -164,6 +164,7 @@ export default function App() {
 
   // Load ggwave library on mount
   useEffect(() => {
+    soundFX.preload();
     modem.loadLibrary().then(() => {
       addLog(`Sonic Heist acoustic engine ready (Audible 3.6 kHz & Ultrasound 16.2 kHz enabled).`, 'info');
     }).catch((err) => {
@@ -249,7 +250,7 @@ export default function App() {
 
         // If currently hunting, ANY response or PONG confirms the thief is caught in range!
         if (activeHeistAsVictimRef.current) {
-          soundFX.playCatchLock();
+          soundFX.play('thief-near');
           addLog(`🎉 THIEF IN RANGE! "${pName}" caught! Cancellation unlocked!`, 'success');
           setActiveHeistAsVictim((prev) => prev ? ({ ...prev, isThiefInRange: true, thiefSignalLevel: 1.0 }) : null);
         }
@@ -355,7 +356,7 @@ export default function App() {
         const m = msg as CatchMessage;
         if (!activeHeistAsThiefRef.current) return;
         addLog(`Victim physically reached range and sent CATCH! Auto-signing CAUGHT...`, 'alert');
-        soundFX.playAlarm();
+        soundFX.play('caught');
 
         // Echo CAUGHT signature over ultrasound
         const caughtBytes = encodeCaught({

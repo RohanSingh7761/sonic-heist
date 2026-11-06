@@ -21,6 +21,12 @@ export default defineConfig({
       }
     })
   ],
+  // ui.html is the new game UI, built alongside the old test app until they are merged.
+  build: {
+    rollupOptions: {
+      input: { main: 'index.html', ui: 'ui.html' }
+    }
+  },
   optimizeDeps: {
     include: ['ggwave']
   },
