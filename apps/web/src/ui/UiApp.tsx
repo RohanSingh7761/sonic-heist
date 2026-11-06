@@ -211,7 +211,7 @@ export function UiApp() {
               echoNonce: m.nonce,
             });
             modem.transmit(pong, proto, 85);
-          }, 250);
+          }, m.targetUid === 0 ? 250 + Math.floor(Math.random() * 5) * 1200 : 250); // Random slot so phones answering a broadcast don't talk over each other
         }
         break;
       }

@@ -21,6 +21,7 @@ export class GgwaveModem {
   private scriptProcessor: ScriptProcessorNode | null = null;
   private mediaStreamSource: MediaStreamAudioSourceNode | null = null;
   private isListening = false;
+  private starting: Promise<void> | null = null;
   private isTransmitting = false;
 
   public availableProtocols: GgwaveProtocol[] = [
@@ -131,6 +132,17 @@ export class GgwaveModem {
     onAudioLevel?: (level: number) => void
   ): Promise<void> {
     if (this.isListening) return;
+    // Taps and effects can overlap here; a second mic feed would corrupt the shared decoder.
+    this.starting ??= this.openMic(onPayloadReceived, onAudioLevel).finally(() => {
+      this.starting = null;
+    });
+    return this.starting;
+  }
+
+  private async openMic(
+    onPayloadReceived: (bytes: Uint8Array) => void,
+    onAudioLevel?: (level: number) => void
+  ): Promise<void> {
     await this.loadLibrary();
     const ctx = this.ensureAudioContext();
 
