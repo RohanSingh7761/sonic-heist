@@ -2,7 +2,12 @@
   "name": "sonicpay-root",
   "private": true,
   "scripts": {
-    "dev": "npm --prefix apps/web run dev",
-    "build": "npm --prefix apps/web run build"
+    "start": "concurrently -n \"BACKEND,WEB\" -c \"magenta,cyan\" \"npm --prefix backend start\" \"npm --prefix apps/web run dev -- --host\"",
+    "dev": "concurrently -n \"BACKEND,WEB\" -c \"magenta,cyan\" \"npm --prefix backend start\" \"npm --prefix apps/web run dev -- --host\"",
+    "build": "npm --prefix apps/web run build",
+    "tunnel": "npx cloudflared tunnel --url http://localhost:5173"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }

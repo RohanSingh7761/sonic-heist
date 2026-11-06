@@ -23,8 +23,8 @@ export function AuthModal({ onSuccess }: Props) {
     setError(null);
 
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    // Backend runs on port 4000, fallback to current host:4000 or relative
-    const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:4000' : `${window.location.protocol}//${window.location.hostname}:4000`;
+    // Use relative endpoint so requests automatically proxy to backend over Vite / Cloudflare tunnel
+    const baseUrl = '';
 
     try {
       const res = await fetch(`${baseUrl}${endpoint}`, {
