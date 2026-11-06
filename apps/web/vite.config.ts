@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    basicSsl(),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -27,13 +29,6 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: [
-      '.loca.lt',
-      'sonicpay-demo.loca.lt',
-      'breezy-bars-appear.loca.lt',
-      'seven-gifts-cough.loca.lt',
-      'localhost',
-      '127.0.0.1'
-    ]
+    allowedHosts: true
   }
 });
