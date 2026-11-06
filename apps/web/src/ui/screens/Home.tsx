@@ -16,6 +16,8 @@ type Props = {
   audioProtocol?: number;
   setAudioProtocol?: (p: number) => void;
   onTestChirp?: () => void;
+  onDepositOnChain?: (amt: number) => void;
+  onWithdrawOnChain?: (amt: number) => void;
 };
 
 export function tableSeats(s: GameState, me?: Partial<SeatInfo>, rivalUid?: number, rivalCoins?: number): SeatInfo[] {
@@ -34,15 +36,44 @@ export function tableSeats(s: GameState, me?: Partial<SeatInfo>, rivalUid?: numb
 
 export function Hud({ s }: { s: GameState }) {
   const level = levelFor(s.thefts + s.saves);
+  const [copied, setCopied] = useState(false);
+  const copyAddress = () => {
+    if (!s.walletAddress) return;
+    navigator.clipboard.writeText(s.walletAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  const shortAddr = s.walletAddress ? `${s.walletAddress.slice(0, 6)}...${s.walletAddress.slice(-4)}` : '';
   return (
     <div className="frame panel">
       <div className="row">
         <Sprite avatar={s.avatar} level={level} state="idle" style={{ width: 60, margin: '-6px 0 -6px -8px' }} />
         <div className="grow" style={{ minWidth: 0 }}>
           <div className="spread"><b style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</b><span className="chip warn">LV {level}</span></div>
+          {s.walletAddress && (
+            <div className="row" style={{ marginTop: 2, marginBottom: 4, gap: 6, alignItems: 'center' }}>
+              <span className="small-text muted" style={{ fontFamily: 'monospace', fontSize: 11 }}>{shortAddr}</span>
+              <button
+                type="button"
+                onClick={copyAddress}
+                style={{
+                  background: 'rgba(235, 184, 82, 0.15)',
+                  border: '1px solid var(--gold)',
+                  borderRadius: 4,
+                  padding: '1px 6px',
+                  color: 'var(--gold)',
+                  fontSize: 10,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          )}
           <div className="spread small-text">
             <span className="row" style={{ gap: 4 }}><Icon name="coin" small /> Stake <b>{fmtEth(s.stake)}</b></span>
-            <span className="row muted" style={{ gap: 4 }}><Icon name="flame" small /> Gas {fmtEth(s.wallet)}</span>
+            <span className="row muted" style={{ gap: 4 }}><Icon name="flame" small /> Bal <b>{fmtEth(s.wallet)}</b></span>
           </div>
         </div>
       </div>
@@ -50,7 +81,7 @@ export function Hud({ s }: { s: GameState }) {
   );
 }
 
-export function TableHome({ s, send, now, onScan }: Props) {
+export function TableHome({ s, send, now, onScan, onDepositOnChain, onWithdrawOnChain }: Props) {
   const [stakeOpen, setStakeOpen] = useState(false);
   const immune = s.immuneUntil - now;
   const cooldown = s.readyAt - now;
@@ -74,10 +105,11 @@ export function TableHome({ s, send, now, onScan }: Props) {
       </div>
       {stakeOpen && (
         <Panel>
-          <p className="small-text muted">Wallet {fmtEth(s.wallet)} ETH pays for gas. Only your stake can be stolen.</p>
-          <div className="row">
-            <Btn small click="deposit" onClick={() => send({ type: 'deposit', amount: 0.05 })}>Add 0.05</Btn>
-            <Btn small click={null} onClick={() => send({ type: 'withdraw', amount: 0.05 })}>Take 0.05</Btn>
+          <p className="small-text muted">Wallet balance pays for gas and stakes. Deposit locks real ETH into Base Sepolia HeistVault.</p>
+          <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            <Btn small click="deposit" onClick={() => onDepositOnChain ? onDepositOnChain(0.001) : send({ type: 'deposit', amount: 0.001 })}>Stake 0.001 ETH</Btn>
+            <Btn small click="deposit" onClick={() => onDepositOnChain ? onDepositOnChain(0.005) : send({ type: 'deposit', amount: 0.005 })}>Stake 0.005 ETH</Btn>
+            <Btn small click={null} onClick={() => onWithdrawOnChain ? onWithdrawOnChain(0.001) : send({ type: 'withdraw', amount: 0.001 })}>Withdraw 0.001 ETH</Btn>
           </div>
         </Panel>
       )}

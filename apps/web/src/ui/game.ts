@@ -41,6 +41,8 @@ export interface GameState {
   view: View;
   avatar: AvatarId;
   name: string;
+  walletAddress?: string;
+  privateKey?: string;
   stake: number;
   wallet: number;
   thefts: number;
@@ -137,6 +139,8 @@ export type Action =
   | { type: 'dismiss' }
   | { type: 'clearNotice' }
   | { type: 'clearLevelUp' }
+  | { type: 'setBalances'; wallet: number; stake: number }
+  | { type: 'setUser'; name: string; walletAddress: string; privateKey: string }
   | { type: 'addWin' }
   | { type: 'tick'; now: number }
   | { type: 'skip'; now: number }
@@ -306,6 +310,10 @@ export function reduce(s: GameState, a: Action): GameState {
       return { ...s, notice: null };
     case 'clearLevelUp':
       return { ...s, levelUpTo: null };
+    case 'setBalances':
+      return { ...s, wallet: a.wallet, stake: a.stake };
+    case 'setUser':
+      return { ...s, name: a.name, walletAddress: a.walletAddress, privateKey: a.privateKey };
     case 'addWin':
       return addWin(s, 'thefts');
     case 'tick':

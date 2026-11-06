@@ -5,6 +5,7 @@ import { soundFX } from '../game/soundFX';
 import { Pick, RoundStart, Setup, Title } from './screens/Intro';
 import { Levels, Log, Scan, Settings, TableHome } from './screens/Home';
 import { HeistScreen } from './screens/Heist';
+import { AuthModal } from './screens/Auth';
 import { modem } from '../audio/ggwaveModem';
 import {
   MessageType,
@@ -23,8 +24,18 @@ import {
   encodeCaught,
 } from '../protocol/codecs';
 import { getPlayerName } from '../protocol/signatures';
+import { fetchOnChainBalances, depositToVault, withdrawFromVault } from '../chain/web3';
 
-function getOrCreateBurner() {
+function getInitialUser() {
+  const savedUser = localStorage.getItem('sonic_heist_user');
+  if (savedUser) {
+    try {
+      return JSON.parse(savedUser);
+    } catch {
+      // Fallback
+    }
+  }
+
   let addr = localStorage.getItem('sonic_heist_addr');
   if (!addr) {
     const randomHex = Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -33,7 +44,12 @@ function getOrCreateBurner() {
   }
   const cleanUid = parseInt(addr.slice(2, 10), 16) >>> 0;
   localStorage.setItem('sonic_heist_uid', cleanUid.toString());
-  return { address: addr as `0x${string}`, uid: cleanUid };
+  return {
+    username: getPlayerName(cleanUid),
+    walletAddress: addr as `0x${string}`,
+    privateKey: localStorage.getItem('sonic_heist_pk') || '',
+    uid: cleanUid,
+  };
 }
 
 const TABS: { view: View; label: string; icon: 'table' | 'star' | 'scroll' | 'gear' }[] = [
@@ -59,7 +75,7 @@ function LevelUp({ s, send }: { s: GameState; send: (a: Action) => void }) {
   );
 }
 
-// Lets you reach every state from one phone, or simulate another device.
+// Single-phone demo controls
 function DemoControls({ s, send, now }: { s: GameState; send: (a: Action) => void; now: number }) {
   const [open, setOpen] = useState(false);
   const act = (a: Action) => { send(a); setOpen(false); };
@@ -85,10 +101,36 @@ function DemoControls({ s, send, now }: { s: GameState; send: (a: Action) => voi
 }
 
 export function UiApp() {
-  const [burner] = useState(getOrCreateBurner);
-  const playerName = getPlayerName(burner.uid);
-  const [s, send] = useReducer(reduce, playerName, initialState);
+  const [currentUser, setCurrentUser] = useState(getInitialUser);
+  const [showAuthModal, setShowAuthModal] = useState(!localStorage.getItem('sonic_heist_user'));
+  const [s, send] = useReducer(reduce, currentUser.username, initialState);
   const now = useNow();
+
+  // Initialize wallet fields in state
+  useEffect(() => {
+    if (currentUser) {
+      send({
+        type: 'setUser',
+        name: currentUser.username,
+        walletAddress: currentUser.walletAddress,
+        privateKey: currentUser.privateKey,
+      });
+    }
+  }, [currentUser]);
+
+  // Synchronize on-chain Base Sepolia balance and vault stake
+  useEffect(() => {
+    if (!currentUser.walletAddress) return;
+    const loadBalances = async () => {
+      const res = await fetchOnChainBalances(currentUser.walletAddress as `0x${string}`);
+      if (res) {
+        send({ type: 'setBalances', wallet: res.walletEth, stake: res.stakeEth });
+      }
+    };
+    loadBalances();
+    const interval = setInterval(loadBalances, 12000); // Poll Base Sepolia every 12s
+    return () => clearInterval(interval);
+  }, [currentUser.walletAddress]);
 
   const [audioProtocol, setAudioProtocol] = useState<number>(() => {
     const saved = localStorage.getItem('sonic_audio_proto_v2');
@@ -102,12 +144,12 @@ export function UiApp() {
 
   const sRef = useRef(s);
   const audioProtocolRef = useRef(audioProtocol);
-  const burnerRef = useRef(burner);
+  const currentUserRef = useRef(currentUser);
 
   useEffect(() => {
     sRef.current = s;
     audioProtocolRef.current = audioProtocol;
-    burnerRef.current = burner;
+    currentUserRef.current = currentUser;
   });
 
   useEffect(() => { send({ type: 'tick', now }); }, [now]);
@@ -119,6 +161,13 @@ export function UiApp() {
     window.addEventListener('pointerdown', first, { once: true });
     return () => window.removeEventListener('pointerdown', first);
   }, []);
+
+  const getUid = () => {
+    if (currentUserRef.current.walletAddress) {
+      return parseInt(currentUserRef.current.walletAddress.slice(2, 10), 16) >>> 0;
+    }
+    return 0;
+  };
 
   // Handle incoming acoustic packets
   const handleIncomingAudio = (bytes: Uint8Array) => {
@@ -132,7 +181,7 @@ export function UiApp() {
     const msg = decodeHeistMessage(bytes);
     if (!msg) return;
 
-    const currentBurner = burnerRef.current;
+    const myUid = getUid();
     const currentS = sRef.current;
     const proto = audioProtocolRef.current;
     const vol = 75;
@@ -142,13 +191,12 @@ export function UiApp() {
         const m = msg as PingMessage;
         const isRunningAsThief = currentS.heist?.role === 'thief' && (currentS.heist.phase === 'headstart' || currentS.heist.phase === 'hunted');
         if (!currentS.patrol && !isRunningAsThief) return;
-        if (currentS.shield) return;
 
-        if (m.targetUid === 0 || m.targetUid === currentBurner.uid || isRunningAsThief) {
+        if (m.targetUid === 0 || m.targetUid === myUid || isRunningAsThief) {
           sfx('radar-ping');
           setTimeout(() => {
             const pong = encodePong({
-              responderUid: currentBurner.uid,
+              responderUid: myUid,
               echoNonce: m.nonce,
             });
             modem.transmit(pong, proto, vol);
@@ -181,8 +229,8 @@ export function UiApp() {
 
       case MessageType.LOOT_REQ: {
         const m = msg as LootReqMessage;
-        if (!currentS.patrol || currentS.shield) return;
-        if (m.victimUid !== currentBurner.uid) return;
+        if (!currentS.patrol) return;
+        if (m.victimUid !== myUid) return;
         if (Date.now() < currentS.immuneUntil) return;
 
         // Auto-sign mock ticket and transmit back over ultrasound
@@ -286,7 +334,7 @@ export function UiApp() {
 
   const onScan = () => {
     const ping = encodePing({
-      scannerUid: burner.uid,
+      scannerUid: getUid(),
       targetUid: 0,
       nonce: Math.floor(Math.random() * 0xffff),
     });
@@ -295,8 +343,9 @@ export function UiApp() {
   };
 
   const onRobTarget = (target: Player) => {
+    const myAddr = (currentUserRef.current.walletAddress || '0x0000000000000000000000000000000000000000') as `0x${string}`;
     const req = encodeLootReq({
-      thiefAddress: burner.address,
+      thiefAddress: myAddr,
       victimUid: target.uid,
     });
     modem.transmit(req, audioProtocol, 75);
@@ -306,7 +355,7 @@ export function UiApp() {
   const onPulseRadar = async () => {
     send({ type: 'pulse' });
     const ping = encodePing({
-      scannerUid: burner.uid,
+      scannerUid: getUid(),
       targetUid: s.heist?.rival.uid || 0,
       nonce: Math.floor(Math.random() * 0xffff),
     });
@@ -324,6 +373,47 @@ export function UiApp() {
     setTimeout(() => {
       modem.transmit(catchMsg, audioProtocol, 75).catch(() => {});
     }, 350);
+  };
+
+  // Requirement 4: Real on-chain Base Sepolia deposit & withdraw
+  const onDepositOnChain = async (amountEth: number) => {
+    if (!currentUserRef.current.privateKey) {
+      alert('Wallet private key not found. Please log in again.');
+      return;
+    }
+    try {
+      send({ type: 'clearNotice' });
+      sfx('coin');
+      const { hash } = await depositToVault(currentUserRef.current.privateKey as `0x${string}`, amountEth);
+      alert(`On-chain deposit sent to Base Sepolia!\nTx: ${hash.slice(0, 16)}...`);
+      // Refresh balances
+      const res = await fetchOnChainBalances(currentUserRef.current.walletAddress as `0x${string}`);
+      if (res) {
+        send({ type: 'setBalances', wallet: res.walletEth, stake: res.stakeEth });
+      }
+    } catch (err: any) {
+      console.error('Deposit error:', err);
+      alert('Base Sepolia Deposit failed: ' + (err?.shortMessage || err?.message || err));
+    }
+  };
+
+  const onWithdrawOnChain = async (amountEth: number) => {
+    if (!currentUserRef.current.privateKey) {
+      alert('Wallet private key not found. Please log in again.');
+      return;
+    }
+    try {
+      sfx('coin');
+      const { hash } = await withdrawFromVault(currentUserRef.current.privateKey as `0x${string}`, amountEth);
+      alert(`On-chain withdrawal completed on Base Sepolia!\nTx: ${hash.slice(0, 16)}...`);
+      const res = await fetchOnChainBalances(currentUserRef.current.walletAddress as `0x${string}`);
+      if (res) {
+        send({ type: 'setBalances', wallet: res.walletEth, stake: res.stakeEth });
+      }
+    } catch (err: any) {
+      console.error('Withdraw error:', err);
+      alert('Base Sepolia Withdraw failed: ' + (err?.shortMessage || err?.message || err));
+    }
   };
 
   const onTestChirp = () => {
@@ -376,6 +466,8 @@ export function UiApp() {
     onSoundCheck,
     onPulseRadar,
     onCancelHeist,
+    onDepositOnChain,
+    onWithdrawOnChain,
   };
 
   const onTab = !s.heist && TABS.some((t) => t.view === s.view);
@@ -406,6 +498,27 @@ export function UiApp() {
       {s.notice && <div className="toast" role="status">{s.notice}</div>}
       <LevelUp s={s} send={send} />
       <DemoControls {...p} />
+
+      {/* Requirement 2: Login / Signup Modal */}
+      {showAuthModal && (
+        <AuthModal
+          onSuccess={(u) => {
+            const cleanUid = parseInt(u.walletAddress.slice(2, 10), 16) >>> 0;
+            const fullUser = {
+              username: u.username,
+              walletAddress: u.walletAddress as `0x${string}`,
+              privateKey: u.privateKey,
+              uid: cleanUid,
+            };
+            localStorage.setItem('sonic_heist_user', JSON.stringify(fullUser));
+            localStorage.setItem('sonic_heist_addr', u.walletAddress);
+            localStorage.setItem('sonic_heist_pk', u.privateKey);
+            localStorage.setItem('sonic_heist_uid', cleanUid.toString());
+            setCurrentUser(fullUser);
+            setShowAuthModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }

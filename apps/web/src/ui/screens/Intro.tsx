@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import type { AvatarId, GameState, Action } from '../game';
-import { MOCK_PLAYERS } from '../game';
 import { AVATARS, Btn, Icon, Panel, Sprite, fmtEth, sfx, useLoop } from '../kit';
 import { RunStage, type Runner } from '../stages';
 
@@ -17,13 +16,13 @@ export function Title({ send }: Props) {
     <main className="screen center mood-night" style={{ padding: 0 }}>
       <div className="grow" />
       <img src="/sprites/logo.svg" alt="Sonic Heist" style={{ width: 'min(74%, 300px)' }} />
-      <p style={{ padding: '4px 20px' }} className="muted">A real-world heist played over sound.</p>
+      <p style={{ padding: '4px 20px' }} className="muted">A real-world heist played over sound on Base Sepolia.</p>
       <div className="grow" />
       <div style={{ width: '100%' }}><RunStage runners={TITLE_RUNNERS} /></div>
       <div className="grow" />
       <div style={{ width: '100%', padding: '0 16px 16px' }}>
         <Btn tone="gold" big block onClick={() => send({ type: 'go', view: 'pick' })}>Start</Btn>
-        <p className="muted small-text" style={{ marginTop: 6 }}>Test ETH only. Real people, real running.</p>
+        <p className="muted small-text" style={{ marginTop: 6 }}>Real Base Sepolia smart contracts & acoustic proximity.</p>
       </div>
     </main>
   );
@@ -51,48 +50,83 @@ export function Pick({ s, send }: Props) {
           ))}
         </div>
       </Panel>
-      <Panel>
-        <p className="small-text">Rob people and catch thieves to level up.</p>
-        <div className="row" style={{ justifyContent: 'space-around' }}>
-          {([1, 2, 3] as const).map((l) => <Sprite key={l} avatar={s.avatar} level={l} state="idle" style={{ width: 84 }} alt={`Level ${l}`} />)}
-        </div>
-      </Panel>
       <div className="grow" />
       <div className="sticky-action"><Btn tone="gold" big block onClick={() => send({ type: 'go', view: 'setup' })}>Choose {a.name}</Btn></div>
     </main>
   );
 }
 
-export function Setup({ s, send, onAllowMic, onSoundCheck }: Props & { onAllowMic?: () => void; onSoundCheck?: () => void }) {
+export function Setup({
+  s,
+  send,
+  onAllowMic,
+  onSoundCheck,
+}: Props & {
+  onAllowMic?: () => void;
+  onSoundCheck?: () => void;
+}) {
   const [testing, setTesting] = useState(false);
   useEffect(() => {
     if (!testing) return;
     const id = setTimeout(() => { send({ type: 'soundOk' }); setTesting(false); sfx('coin'); }, 1400);
     return () => clearTimeout(id);
   }, [testing, send]);
-  const ready = s.micOk && s.soundOk && s.stake > 0;
+
+  // Requirement 3: Only mic and sound check required to proceed
+  const ready = s.micOk && s.soundOk;
+
   return (
     <main className="screen">
       <h1 className="title">Get ready</h1>
       <Panel>
-        <div className="spread"><b className="row"><Icon name="mic" /> 1. Microphone</b>{s.micOk && <span className="chip good">Allowed</span>}</div>
-        <p className="small-text muted">Listens for game signals only. Nothing is recorded, stored or uploaded.</p>
-        {!s.micOk && <Btn block small onClick={onAllowMic ? onAllowMic : () => send({ type: 'micOk' })}>Allow microphone</Btn>}
-      </Panel>
-      <Panel>
-        <div className="spread"><b className="row"><Icon name="flame" /> 2. Sound check</b>{s.soundOk && <span className="chip good">Passed</span>}</div>
-        <p className="small-text muted">Checks that this phone can send and hear the signal.</p>
-        {!s.soundOk && <Btn block small disabled={testing || !s.micOk} click="radar-ping" onClick={() => { if (onSoundCheck) { setTesting(true); Promise.resolve(onSoundCheck()).finally(() => setTesting(false)); } else { setTesting(true); } }}>{testing ? 'Listening...' : s.micOk ? 'Run check' : 'Allow microphone first'}</Btn>}
-      </Panel>
-      <Panel>
-        <div className="spread"><b className="row"><Icon name="coin" /> 3. Your stake</b>{s.stake > 0 && <span className="chip good">{fmtEth(s.stake)} ETH</span>}</div>
-        <p className="small-text muted">This is what others can steal, 5% to 25% at a time. Gas stays in your wallet ({fmtEth(s.wallet)} ETH).</p>
-        <div className="row">
-          {[0.05, 0.1, 0.2].map((v) => <Btn key={v} small click="deposit" onClick={() => send({ type: 'deposit', amount: v })}>+{v}</Btn>)}
+        <div className="spread">
+          <b className="row"><Icon name="mic" /> 1. Microphone</b>
+          {s.micOk && <span className="chip good">Allowed</span>}
         </div>
+        <p className="small-text muted">Listens for ultrasound game signals only. Nothing is recorded or uploaded.</p>
+        {!s.micOk && (
+          <Btn block small onClick={onAllowMic ? onAllowMic : () => send({ type: 'micOk' })}>
+            Allow microphone
+          </Btn>
+        )}
       </Panel>
+
+      <Panel>
+        <div className="spread">
+          <b className="row"><Icon name="flame" /> 2. Sound check</b>
+          {s.soundOk && <span className="chip good">Passed</span>}
+        </div>
+        <p className="small-text muted">Emits and verifies ultrasound transmission on this device.</p>
+        {!s.soundOk && (
+          <Btn
+            block
+            small
+            disabled={testing || !s.micOk}
+            click="radar-ping"
+            onClick={() => {
+              if (onSoundCheck) {
+                setTesting(true);
+                Promise.resolve(onSoundCheck()).finally(() => setTesting(false));
+              } else {
+                setTesting(true);
+              }
+            }}
+          >
+            {testing ? 'Listening...' : s.micOk ? 'Run check' : 'Allow microphone first'}
+          </Btn>
+        )}
+      </Panel>
+
       <div className="grow" />
-      <Btn tone="gold" big block disabled={!ready} onClick={() => send({ type: 'go', view: 'round' })}>{ready ? 'Join the table' : 'Finish all 3 steps'}</Btn>
+      <Btn
+        tone="gold"
+        big
+        block
+        disabled={!ready}
+        onClick={() => send({ type: 'go', view: 'round' })}
+      >
+        {ready ? 'Proceed to Table' : 'Finish sound check to proceed'}
+      </Btn>
     </main>
   );
 }
@@ -101,21 +135,20 @@ export function Setup({ s, send, onAllowMic, onSoundCheck }: Props & { onAllowMi
 export function RoundStart({ s, send }: Props) {
   useLoop(s.soundOn ? 'run-loop' : null, 0.45);
   useLoop(s.soundOn ? 'footsteps-loop' : null, 0.4);
-  const cast = MOCK_PLAYERS.slice(0, 4);
   const runners: Runner[] = [
     { avatar: s.avatar, level: 1, state: 'run', x: 70, y: 56, label: 'You' },
-    { avatar: cast[0].avatar, level: cast[0].level, state: 'run', x: 26, y: 44 },
-    { avatar: cast[1].avatar, level: cast[1].level, state: 'run', x: -14, y: 62 },
-    { avatar: cast[2].avatar, level: cast[2].level, state: 'run', x: -58, y: 46 },
-    { avatar: cast[3].avatar, level: cast[3].level, state: 'run', x: -92, y: 62 },
+    { avatar: 'nib', level: 1, state: 'run', x: 26, y: 44 },
+    { avatar: 'juno', level: 2, state: 'run', x: -14, y: 62 },
+    { avatar: 'rocco', level: 1, state: 'run', x: -58, y: 46 },
+    { avatar: 'juno', level: 3, state: 'run', x: -92, y: 62 },
   ];
   return (
     <main className="screen center mood-night" style={{ padding: 0 }}>
       <div className="grow" />
-      <p className="muted">Round started</p>
+      <p className="muted">Base Sepolia Round started</p>
       <h1 className="title" style={{ color: 'var(--gold)', fontSize: 54 }}>Everyone runs!</h1>
       <div style={{ width: '100%', marginTop: 10 }}><RunStage runners={runners} /></div>
-      <p style={{ padding: 16 }}>Your stake is locked in. Keep your phone on you and stay on patrol.</p>
+      <p style={{ padding: 16 }}>Keep your phone on you and stay on patrol for acoustic ultrasound pulses.</p>
       <div className="grow" />
       <div style={{ width: '100%', padding: '0 16px 16px' }}>
         <Btn tone="gold" big block onClick={() => send({ type: 'go', view: 'table' })}>Take your seat</Btn>
