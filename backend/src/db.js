@@ -22,6 +22,10 @@ export async function initDb() {
         private_key VARCHAR(66) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS thefts INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS saves INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS losses INTEGER NOT NULL DEFAULT 0;
     `);
     console.log('PostgreSQL database connected and initialized successfully');
   } finally {

@@ -198,6 +198,7 @@ export function Levels({ s, send }: Props) {
       <div className="row" style={{ alignItems: 'stretch' }}>
         <Panel className="grow"><div className="muted small-text">Thefts</div><div className="title">{s.thefts}</div></Panel>
         <Panel className="grow"><div className="muted small-text">Saves</div><div className="title">{s.saves}</div></Panel>
+        <Panel className="grow"><div className="muted small-text">Losses</div><div className="title">{s.losses}</div></Panel>
       </div>
       {next ? (
         <Panel>
