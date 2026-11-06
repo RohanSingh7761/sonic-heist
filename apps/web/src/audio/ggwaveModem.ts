@@ -31,7 +31,7 @@ export class GgwaveModem {
     { id: 3, name: 'Ultrasound Normal (~15.8 kHz, Quiet)', isUltrasonic: true },
     { id: 5, name: 'Ultrasound Fastest (~17.0 kHz, Inaudible)', isUltrasonic: true },
   ];
-  public defaultProtocolId = 1;
+  public defaultProtocolId = 4; // Default to Ultrasound Fast (~16.2 kHz, Inaudible)
 
   // Load WASM and ggwave library (does NOT touch AudioContext yet to avoid iOS restrictions)
   async loadLibrary(): Promise<void> {

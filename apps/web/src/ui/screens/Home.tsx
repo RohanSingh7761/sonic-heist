@@ -59,8 +59,8 @@ export function TableHome({ s, send, now, onScan }: Props) {
       <Hud s={s} />
       <TableStage seats={tableSeats(s)} />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }} aria-label="Status">
-        <span className={`chip ${s.patrol && !s.shield ? 'good' : ''}`}><Icon name="mic" small />{s.patrol ? 'On patrol' : 'Patrol off'}</span>
-        {s.shield && <span className="chip warn"><Icon name="shield" small />Shielded</span>}
+        <span className={`chip ${s.patrol ? 'good' : ''}`}><Icon name="mic" small />{s.patrol ? 'On patrol' : 'Patrol off'}</span>
+
         {immune > 0 && <span className="chip good"><Icon name="shield" small />Immune {fmtTime(immune)}</span>}
         {cooldown > 0 && <span className="chip bad">Cooldown {fmtTime(cooldown)}</span>}
       </div>
@@ -69,7 +69,7 @@ export function TableHome({ s, send, now, onScan }: Props) {
       </Btn>
       <div className="row">
         <Btn small pressed={s.patrol} onClick={() => send({ type: 'toggle', key: 'patrol' })}><Icon name="mic" small />Patrol</Btn>
-        <Btn small pressed={s.shield} click="shield-on" onClick={() => send({ type: 'toggle', key: 'shield' })}><Icon name="shield" small />Shield</Btn>
+
         <Btn small pressed={stakeOpen} onClick={() => setStakeOpen(!stakeOpen)}><Icon name="coin" small />Stake</Btn>
       </div>
       {stakeOpen && (
@@ -124,6 +124,16 @@ export function Scan({ s, send, now, onScan, onRobTarget }: Props) {
             </Btn>
           ))}
         </>
+      )}
+      {done && s.nearby.length === 0 && (
+        <Panel>
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <b style={{ display: 'block', fontSize: 18, marginBottom: 6 }}>No targets found nearby</b>
+            <p className="small-text muted">
+              Make sure nearby phones have Patrol ON and are within acoustic range.
+            </p>
+          </div>
+        </Panel>
       )}
       <div className="grow" />
       {done && (
@@ -189,7 +199,7 @@ export function Log({ s }: Props) {
   );
 }
 
-export function Settings({ s, send, audioProtocol = 1, setAudioProtocol, onTestChirp }: Props) {
+export function Settings({ s, send, audioProtocol = 4, setAudioProtocol, onTestChirp }: Props) {
   const Setting = ({ label, hint, k }: { label: string; hint: string; k: 'soundOn' | 'shield' | 'patrol' }) => (
     <Panel>
       <div className="spread">
@@ -203,12 +213,12 @@ export function Settings({ s, send, audioProtocol = 1, setAudioProtocol, onTestC
       <h1 className="title">Settings</h1>
       <Setting label="Game sounds" hint="Coins, sirens and music" k="soundOn" />
       <Setting label="Patrol" hint="Listen for game signals nearby" k="patrol" />
-      <Setting label="Shield" hint="Stop answering pings, for private spaces" k="shield" />
+
       <Panel>
         <div className="spread">
           <div>
             <b>Acoustic Band</b>
-            <div className="small-text muted">{audioProtocol === 1 ? '3.6 kHz Audible Fast (Recommended)' : audioProtocol === 4 ? '16.2 kHz Ultrasound Fast (Inaudible)' : '17.5 kHz Ultrasound Fastest'}</div>
+            <div className="small-text muted">{audioProtocol === 4 ? '16.2 kHz Ultrasound Fast (Default, Inaudible)' : audioProtocol === 5 ? '17.5 kHz Ultrasound Fastest (Inaudible)' : '3.6 kHz Audible Fast'}</div>
           </div>
           {setAudioProtocol && (
             <select

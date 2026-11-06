@@ -91,13 +91,13 @@ export function UiApp() {
   const now = useNow();
 
   const [audioProtocol, setAudioProtocol] = useState<number>(() => {
-    const saved = localStorage.getItem('sonic_audio_proto');
-    return saved ? Number(saved) : 1; // 1: Audible Fast, 4: Ultrasound Fast, 5: Ultrasound Fastest
+    const saved = localStorage.getItem('sonic_audio_proto_v2');
+    return saved ? Number(saved) : 4; // Default to 4 (Ultrasound Fast 16.2 kHz, inaudible)
   });
 
   const handleSetAudioProtocol = (proto: number) => {
     setAudioProtocol(proto);
-    localStorage.setItem('sonic_audio_proto', proto.toString());
+    localStorage.setItem('sonic_audio_proto_v2', proto.toString());
   };
 
   const sRef = useRef(s);

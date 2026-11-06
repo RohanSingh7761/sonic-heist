@@ -198,7 +198,7 @@ function lost(s: GameState, h: Heist): GameState {
 function advance(s: GameState, now: number): GameState {
   let next = s;
   if (next.scanEnds !== null && now >= next.scanEnds) {
-    const players = next.nearby.length > 0 ? next.nearby : MOCK_PLAYERS;
+    const players = next.nearby;
     next = { ...next, scanEnds: null, nearby: players };
   }
   for (let i = 0; i < 8; i++) {
