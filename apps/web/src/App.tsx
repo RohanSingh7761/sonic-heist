@@ -44,6 +44,7 @@ import { ThiefRunView } from './components/ThiefRunView';
 import { VictimHuntView } from './components/VictimHuntView';
 import { ActivityLog, GameLogEntry } from './components/ActivityLog';
 import { soundFX } from './game/soundFX';
+import { CONFIG } from './config';
 
 // Simple deterministic burner account generation for demo
 function getOrCreateBurner() {
@@ -443,6 +444,15 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <a
+              href={CONFIG.blockExplorer}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 underline flex items-center gap-1"
+              title="View verified contract on Blockscout"
+            >
+              0xd219...eAb7
+            </a>
             <div
               className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${
                 isOnline
