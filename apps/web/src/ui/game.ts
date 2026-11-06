@@ -287,13 +287,13 @@ export function reduce(s: GameState, a: Action): GameState {
     case 'pulse': {
       if (h?.phase !== 'hunting') return s;
       const pulses = h.pulses + 1;
-      return { ...s, heist: { ...h, pulses, signal: 1.0, inRange: true } };
+      return { ...s, heist: { ...h, pulses, signal: 0, inRange: false } };
     }
     case 'cancel':
       if (h?.phase !== 'hunting' || !h.inRange) return s;
       return { ...s, heist: { ...h, phase: 'handshake', phaseEnds: a.now + HANDSHAKE_TIME } };
     case 'victimFoundMe':
-      if (!h || (h.phase !== 'headstart' && h.phase !== 'hunted')) return s;
+      if (!h || h.role !== 'thief') return s;
       return log({ ...s, readyAt: a.now + COOLDOWN, heist: { ...h, phase: 'caught', phaseEnds: null } }, 'bad', `${h.rival.name} caught you. Bond of ${eth(h.bond)} lost`, a.now);
     case 'claim': {
       if (h?.phase !== 'won') return s;

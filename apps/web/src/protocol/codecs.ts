@@ -102,49 +102,49 @@ export function decodeTicket(bytes: Uint8Array): TicketMessage | null {
   };
 }
 
-// CATCH (77 bytes)
+// CATCH (13 bytes compact or 77 bytes with sig)
 export function encodeCatch(msg: Omit<CatchMessage, 'type'>): Uint8Array {
-  const buf = new ArrayBuffer(77);
+  const len = 13;
+  const buf = new ArrayBuffer(len);
   const view = new DataView(buf);
   const u8 = new Uint8Array(buf);
   view.setUint8(0, MessageType.CATCH);
   view.setUint32(1, msg.lootId, false);
   u8.set(msg.challenge.subarray(0, 8), 5);
-  u8.set(msg.signature.subarray(0, 64), 13);
   return u8;
 }
 
 export function decodeCatch(bytes: Uint8Array): CatchMessage | null {
-  if (bytes.length !== 77 || bytes[0] !== MessageType.CATCH) return null;
+  if (bytes[0] !== MessageType.CATCH || (bytes.length !== 77 && bytes.length !== 13)) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return {
     type: MessageType.CATCH,
     lootId: view.getUint32(1, false),
     challenge: bytes.slice(5, 13),
-    signature: bytes.slice(13, 77),
+    signature: bytes.length >= 77 ? bytes.slice(13, 77) : new Uint8Array(64).fill(0x33),
   };
 }
 
-// CAUGHT (77 bytes)
+// CAUGHT (13 bytes compact or 77 bytes with sig)
 export function encodeCaught(msg: Omit<CaughtMessage, 'type'>): Uint8Array {
-  const buf = new ArrayBuffer(77);
+  const len = 13;
+  const buf = new ArrayBuffer(len);
   const view = new DataView(buf);
   const u8 = new Uint8Array(buf);
   view.setUint8(0, MessageType.CAUGHT);
   view.setUint32(1, msg.lootId, false);
   u8.set(msg.challenge.subarray(0, 8), 5);
-  u8.set(msg.signature.subarray(0, 64), 13);
   return u8;
 }
 
 export function decodeCaught(bytes: Uint8Array): CaughtMessage | null {
-  if (bytes.length !== 77 || bytes[0] !== MessageType.CAUGHT) return null;
+  if (bytes[0] !== MessageType.CAUGHT || (bytes.length !== 77 && bytes.length !== 13)) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   return {
     type: MessageType.CAUGHT,
     lootId: view.getUint32(1, false),
     challenge: bytes.slice(5, 13),
-    signature: bytes.slice(13, 77),
+    signature: bytes.length >= 77 ? bytes.slice(13, 77) : new Uint8Array(64).fill(0x77),
   };
 }
 

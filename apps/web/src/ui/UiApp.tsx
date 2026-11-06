@@ -259,12 +259,12 @@ export function UiApp() {
     };
   }, []);
 
-  // Ensure modem is listening if patrol is on and mic is granted
+  // Ensure modem is listening if mic is granted and patrol is on OR heist is active
   useEffect(() => {
-    if (s.micOk && s.patrol) {
+    if (s.micOk && (s.patrol || s.heist !== null)) {
       ensureListening().catch(() => {});
     }
-  }, [s.micOk, s.patrol]);
+  }, [s.micOk, s.patrol, s.heist?.phase]);
 
   // Button Action Callbacks
   const onAllowMic = async () => {
@@ -303,24 +303,27 @@ export function UiApp() {
     send({ type: 'rob', now: Date.now(), lootRate: 0.15 });
   };
 
-  const onPulseRadar = () => {
+  const onPulseRadar = async () => {
+    send({ type: 'pulse' });
     const ping = encodePing({
       scannerUid: burner.uid,
       targetUid: s.heist?.rival.uid || 0,
       nonce: Math.floor(Math.random() * 0xffff),
     });
-    modem.transmit(ping, audioProtocol, 75);
-    send({ type: 'pulse' });
+    await modem.transmit(ping, audioProtocol, 75);
   };
 
-  const onCancelHeist = () => {
+  const onCancelHeist = async () => {
+    send({ type: 'cancel', now: Date.now() });
     const catchMsg = encodeCatch({
       lootId: 101,
       challenge: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]),
       signature: new Uint8Array(64).fill(0x33),
     });
-    modem.transmit(catchMsg, audioProtocol, 75);
-    send({ type: 'cancel', now: Date.now() });
+    await modem.transmit(catchMsg, audioProtocol, 75);
+    setTimeout(() => {
+      modem.transmit(catchMsg, audioProtocol, 75).catch(() => {});
+    }, 350);
   };
 
   const onTestChirp = () => {

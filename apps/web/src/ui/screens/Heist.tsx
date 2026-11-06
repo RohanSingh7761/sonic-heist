@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Action, GameState, Heist as HeistState } from '../game';
 import { levelFor, MOCK_PLAYERS } from '../game';
 import { Btn, ClosenessMeter, Panel, Sprite, fmtEth, fmtTime, playerSprite, sfx, useLoop, closeness } from '../kit';
@@ -141,6 +141,20 @@ function Hunt({ s, send, h, now, onPulseRadar, onCancelHeist }: Props) {
   const level = levelFor(s.thefts + s.saves);
   const shaking = h.phase === 'handshake';
   const remaining = left(h, now);
+  const [isPulsing, setIsPulsing] = useState(false);
+
+  const handlePulse = async () => {
+    setIsPulsing(true);
+    try {
+      if (onPulseRadar) {
+        await onPulseRadar();
+      } else {
+        send({ type: 'pulse' });
+      }
+    } finally {
+      setTimeout(() => setIsPulsing(false), 1500);
+    }
+  };
   return (
     <main className="screen mood-night">
       <div className="spread">
@@ -157,7 +171,22 @@ function Hunt({ s, send, h, now, onPulseRadar, onCancelHeist }: Props) {
         )}
       </div>
       <Panel>
-        <div className="spread"><b>{h.signal > 0 ? `Signal: ${closeness(h.signal)}` : 'No signal yet'}</b><ClosenessMeter signal={h.signal} hot={h.inRange} /></div>
+        <div className="spread">
+          <b>
+            {h.pulses === 0
+              ? 'Radar standby'
+              : isPulsing
+              ? 'Pulsing radar... listening'
+              : h.inRange
+              ? 'Thief located in range!'
+              : 'No reflection heard (move closer)'}
+          </b>
+          {h.pulses > 0 ? (
+            <ClosenessMeter signal={h.signal} hot={h.inRange} />
+          ) : (
+            <span className="small-text muted">Pulse to scan</span>
+          )}
+        </div>
         <div className="spread small-text muted" style={{ marginTop: 4 }}>
           <span>At stake: {fmtEth(h.amount)} ETH</span><span>Bond to win: {fmtEth(h.bond)}</span>
         </div>
@@ -168,7 +197,7 @@ function Hunt({ s, send, h, now, onPulseRadar, onCancelHeist }: Props) {
       ) : h.inRange ? (
         <Btn tone="red" big block click="bang" onClick={() => onCancelHeist ? onCancelHeist() : send({ type: 'cancel', now })}>Catch thief! Cancel heist</Btn>
       ) : (
-        <Btn tone="gold" big block click="radar-ping" onClick={() => onPulseRadar ? onPulseRadar() : send({ type: 'pulse' })}>Pulse radar</Btn>
+        <Btn tone="gold" big block disabled={isPulsing} click="radar-ping" onClick={handlePulse}>{isPulsing ? 'Pulsing ultrasound radar...' : 'Pulse radar'}</Btn>
 
       )}
     </main>
