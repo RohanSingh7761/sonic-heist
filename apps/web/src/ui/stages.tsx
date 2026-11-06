@@ -15,7 +15,7 @@ export const SEATS: { x: number; y: number; stack: readonly [number, number]; fr
 ];
 export const MY_SEAT = 3;
 const RIVAL_SEATS = [0, 1, 2, 4];
-export const rivalSeat = (i: number) => RIVAL_SEATS[i % RIVAL_SEATS.length];
+export const rivalSeat = (i: number) => RIVAL_SEATS[Math.abs(i || 0) % RIVAL_SEATS.length];
 
 export interface SeatInfo { avatar: AvatarId; level: Level; state?: SpriteState; empty?: boolean; tag?: string; coins?: number; label: string }
 export interface Walker { avatar: AvatarId; level: Level; state: SpriteState; path: [number, number][]; ms: number }
@@ -73,8 +73,8 @@ export function TableStage({ seats, walker }: { seats: SeatInfo[]; walker?: Walk
 
 // Route around the front of the table to a seat's coin stack.
 export function pathToSeat(from: number, to: number): [number, number][] {
-  const a = SEATS[from];
-  const b = SEATS[to];
+  const a = SEATS[from] || SEATS[0];
+  const b = SEATS[to] || SEATS[1] || SEATS[0];
   const endX = b.stack[0] - 18;
   return [[a.x, a.y], [a.x + 18, 118], [endX, 118], ...(b.front ? ([[b.x - 8, 96]] as [number, number][]) : [])];
 }

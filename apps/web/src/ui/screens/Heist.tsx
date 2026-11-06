@@ -20,7 +20,8 @@ const left = (h: HeistState, now: number) => (h.deadline ?? now) - now;
 // ---------- thief ----------
 function Sneak({ s, h }: Props) {
   const level = levelFor(s.thefts + s.saves);
-  const seatIdx = rivalSeat(MOCK_PLAYERS.findIndex((p) => p.uid === h.rival.uid));
+  const mockIdx = MOCK_PLAYERS.findIndex((p) => p.uid === h.rival.uid);
+  const seatIdx = rivalSeat(mockIdx >= 0 ? mockIdx : (Math.abs(h.rival.uid || 0) % 4));
   const path = pathToSeat(MY_SEAT, seatIdx);
   const end = path[path.length - 1];
   const moving = h.phase === 'ticket';
@@ -164,11 +165,11 @@ function Hunt({ s, send, h, now, onPulseRadar, onCancelHeist }: Props) {
       <div className="grow" />
       {shaking ? (
         <Panel><b>Catching them...</b><p className="small-text muted">Stay close. Exchanging signed messages, then cancelling on-chain.</p><div className="bar red"><div style={{ width: `${100 - (((h.phaseEnds as number) - now) / 4000) * 100}%` }} /></div></Panel>
+      ) : h.inRange ? (
+        <Btn tone="red" big block click="bang" onClick={() => onCancelHeist ? onCancelHeist() : send({ type: 'cancel', now })}>Catch thief! Cancel heist</Btn>
       ) : (
-        <>
-          <Btn big block disabled={h.inRange} click="radar-ping" onClick={() => onPulseRadar ? onPulseRadar() : send({ type: 'pulse' })}>{h.inRange ? 'Thief located' : 'Pulse radar'}</Btn>
-          <Btn tone="red" big block disabled={!h.inRange} click="bang" onClick={() => onCancelHeist ? onCancelHeist() : send({ type: 'cancel', now })}>{h.inRange ? 'Catch them! Cancel heist' : 'Pulse radar to locate'}</Btn>
-        </>
+        <Btn tone="gold" big block click="radar-ping" onClick={() => onPulseRadar ? onPulseRadar() : send({ type: 'pulse' })}>Pulse radar</Btn>
+
       )}
     </main>
   );

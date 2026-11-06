@@ -24,6 +24,10 @@ export function tableSeats(s: GameState, me?: Partial<SeatInfo>, rivalUid?: numb
   MOCK_PLAYERS.forEach((p, i) => {
     seats[rivalSeat(i)] = { avatar: p.avatar, level: p.level, label: p.name, coins: p.uid === rivalUid ? rivalCoins : 4 };
   });
+  if (rivalUid && !MOCK_PLAYERS.some((p) => p.uid === rivalUid)) {
+    const sIdx = rivalSeat(Math.abs(rivalUid) % 4);
+    seats[sIdx] = { avatar: 'nib', level: 1, label: 'Target', coins: rivalCoins ?? 2 };
+  }
   seats[MY_SEAT] = { avatar: s.avatar, level, tag: 'YOU', label: `You, ${AVATARS[s.avatar].name}`, coins: Math.max(1, Math.min(4, Math.ceil(s.stake / 0.05))), ...me };
   return seats;
 }
