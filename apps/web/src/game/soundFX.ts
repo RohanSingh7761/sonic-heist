@@ -1,7 +1,20 @@
-// Sci-Fi Game Sound Effects Synthesizer using Web Audio API
+// Retro game sounds: plays the chiptune WAVs rendered by scripts/gen-sfx.mjs into public/sfx.
+
+// Checked against the rendered files whenever gen-sfx runs.
+export const SFX_NAMES = [
+  'coin', 'coin-drop', 'loot-grab', 'deposit', 'jackpot', 'stake-lost',
+  'footsteps-loop', 'run-loop', 'sneak-loop', 'dash', 'heist-start',
+  'cry', 'tear',
+  'swag', 'bling',
+  'alert', 'bang', 'robbed', 'tick', 'tick-urgent', 'radar-ping', 'thief-near',
+  'caught', 'saved', 'level-up', 'ui-click', 'ui-deny', 'shield-on',
+] as const;
+
+export type SfxName = (typeof SFX_NAMES)[number];
 
 class SoundFX {
   private ctx: AudioContext | null = null;
+  private buffers = new Map<SfxName, Promise<AudioBuffer>>();
 
   private getContext(): AudioContext {
     if (!this.ctx) {
@@ -14,96 +27,65 @@ class SoundFX {
     return this.ctx;
   }
 
-  // Radar blip when discovering a player
-  playRadarPing() {
-    try {
-      const ctx = this.getContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1);
-
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.2);
-    } catch (_) {}
+  private load(name: SfxName): Promise<AudioBuffer> {
+    let buffer = this.buffers.get(name);
+    if (!buffer) {
+      buffer = fetch(`sfx/${name}.wav`)
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.arrayBuffer();
+        })
+        .then((bytes) => this.getContext().decodeAudioData(bytes));
+      // Let a failed download (e.g. a network blip) retry on the next play.
+      buffer.catch(() => this.buffers.delete(name));
+      this.buffers.set(name, buffer);
+    }
+    return buffer;
   }
 
-  // Dramatic drop sound when starting a heist
-  playHeistStart() {
-    try {
-      const ctx = this.getContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.4);
-
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.45);
-    } catch (_) {}
+  // Fetch everything ahead of time so the first play of a sound has no delay.
+  preload() {
+    SFX_NAMES.forEach((name) => this.load(name).catch(() => {}));
   }
 
-  // Emergency pulsating alarm when victim is robbed
-  playAlarm() {
-    try {
-      const ctx = this.getContext();
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(700, now);
-      osc.frequency.linearRampToValueAtTime(950, now + 0.15);
-      osc.frequency.linearRampToValueAtTime(700, now + 0.3);
-
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.35);
-    } catch (_) {}
-  }
-
-  // High-tech lock-on confirmation chime when victim catches the thief
-  playCatchLock() {
-    try {
-      const ctx = this.getContext();
-      const now = ctx.currentTime;
-      [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
+  // Sound problems must never break the game, so failures only warn. Returns a function that stops the sound.
+  play(name: SfxName, { loop = false, volume = 0.6 } = {}): () => void {
+    let stopped = false;
+    let source: AudioBufferSourceNode | null = null;
+    const ctx = this.getContext(); // resume now: browsers only allow it during the user's tap, not after the await
+    this.load(name)
+      .then((buffer) => {
+        if (stopped) return;
         const gain = ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-
-        gain.gain.setValueAtTime(0.08, now + idx * 0.06);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.2);
-
-        osc.connect(gain);
+        gain.gain.value = volume;
+        source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = loop;
+        source.connect(gain);
         gain.connect(ctx.destination);
+        source.start();
+      })
+      .catch((err) => console.warn(`Sound "${name}" failed:`, err));
+    return () => {
+      stopped = true;
+      source?.stop();
+    };
+  }
 
-        osc.start(now + idx * 0.06);
-        osc.stop(now + idx * 0.06 + 0.2);
-      });
-    } catch (_) {}
+  playRadarPing() {
+    this.play('radar-ping');
+  }
+
+  playHeistStart() {
+    this.play('heist-start');
+  }
+
+  playAlarm() {
+    this.play('alert');
+  }
+
+  playCatchLock() {
+    this.play('saved');
   }
 }
 

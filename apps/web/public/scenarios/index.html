@@ -1,0 +1,243 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Sonic Heist Scenarios</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;background:#fff4e4;color:#4a3a2c;font:600 14px/1.4 ui-monospace,Menlo,monospace;padding:20px 16px 40px}
+  main{max-width:980px;margin:auto}
+  h1{color:#e5484d;letter-spacing:.12em;margin:0}
+  h2{margin:26px 0 10px;text-transform:uppercase;letter-spacing:.1em;font-size:15px;border-bottom:4px solid #e5484d;padding-bottom:4px}
+  .layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;margin-top:14px}
+  @media(max-width:760px){.layout{grid-template-columns:minmax(0,1fr)}}
+  .stage{position:sticky;top:8px;align-self:start;background:#fffaf1;border:3px solid #2a2230;box-shadow:0 4px 0 #2a2230;padding:10px}
+  /* Keep the preview in view while scrolling the buttons on small screens. */
+  @media(max-width:760px){.stage{top:0;z-index:2;padding:6px}.screen{height:170px!important}#log{height:44px!important;margin:4px 0!important}#stop{padding:3px 10px}}
+  .screen{height:300px;display:flex;align-items:center;justify-content:center;background:#fff4e4;overflow:hidden}
+  .screen img{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain}
+  #caption{margin:10px 0 2px;color:#2a2230;min-height:20px}
+  .track{height:8px;background:#e8dcc8}#bar{height:100%;width:0;background:#e5484d}
+  #log{height:112px;overflow:auto;margin:8px 0;padding:6px;background:#2a2230;color:#5fe3d9;font-size:12px;font-weight:500}
+  #log div{white-space:pre}
+  .btn{appearance:none;font:inherit;color:#2a2230;cursor:pointer;background:#fffaf1;border:3px solid #2a2230;padding:8px 10px;box-shadow:0 3px 0 #2a2230;text-align:left}
+  .btn:focus-visible{outline:3px solid #2fb3ad;outline-offset:2px}
+  .btn:active,.btn[aria-pressed=true]{transform:translateY(3px);box-shadow:none;background:#ffe6b8}
+  .row{display:flex;flex-wrap:wrap;gap:8px}
+  .scn{display:grid;gap:8px}
+  .scn .btn small{display:block;color:#7a6a58;font-weight:500}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+  .tiles .btn{padding:4px;text-align:center;font-size:12px}
+  .tiles img{width:100%;aspect-ratio:1;display:block}
+  #stop{width:100%;text-align:center;background:#f7d2cf}
+</style>
+<main>
+  <h1>SONIC HEIST</h1>
+  <div>Click a scenario to play its animation and sounds together. Turn your volume up.</div>
+  <div class="layout">
+    <section class="stage" aria-label="Preview">
+      <div class="screen"><img id="screen" alt=""></div>
+      <div id="caption" aria-live="polite">Pick a scenario.</div>
+      <div class="track"><div id="bar"></div></div>
+      <div id="log" aria-label="Sounds played"></div>
+      <button class="btn" id="stop">Stop</button>
+    </section>
+    <section>
+      <h2 style="margin-top:0">Your avatar</h2>
+      <div class="row" id="avatars"></div>
+      <div class="row" id="levels" style="margin-top:8px"></div>
+      <h2>Scenarios</h2>
+      <div class="scn" id="scenarios"></div>
+    </section>
+  </div>
+  <h2>Single states</h2>
+  <div class="tiles" id="tiles"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const pick = { avatar: 'rocco', level: 2 };
+const sprite = (state, level = pick.level) => `../sprites/${pick.avatar}/lv${level}/${state}.svg`;
+const scene = (name) => `../sprites/scenes/${name}.svg`;
+
+// Each step: art, length, caption, one-shot sounds [ms, name] and loops [name, fromMs, toMs].
+const SCENARIOS = [
+  { title: 'Round table', note: "What everyone sees, including during someone else's heist", steps: () => [
+    { art: scene('table-idle'), ms: 5000, text: 'Players at the table. Stake goes in.', cues: [[300, 'ui-click'], [800, 'deposit'], [2400, 'coin'], [3800, 'radar-ping']] },
+  ] },
+  { title: "Heist on the thief's screen", note: 'Full scene: Rocco sneaks over, grabs the stake and runs', steps: () => [
+    { art: scene('heist-thief-view'), ms: 11000, text: 'Sneak, grab, disguise, run. Nobody else reacts.',
+      cues: [[200, 'ui-click'], [5400, 'loot-grab'], [7000, 'bling'], [7400, 'heist-start'], [8400, 'dash']],
+      loops: [['sneak-loop', 1400, 5400], ['run-loop', 8400, 11000], ['footsteps-loop', 8400, 11000]] },
+  ] },
+  { title: 'Everyone runs', note: 'Full scene: all avatars run together', steps: () => [
+    { art: scene('run-all'), ms: 6000, text: 'The group run.', cues: [[0, 'dash']], loops: [['run-loop', 0, 6000], ['footsteps-loop', 0, 6000]] },
+  ] },
+  { title: 'Thief gets away', note: 'Your avatar: sneak, loot, run, then swag', steps: () => [
+    { art: sprite('sneak'), ms: 3040, text: 'Sneaking up to the target...', loops: [['sneak-loop', 0, 3040]] },
+    { art: sprite('thief'), ms: 1900, text: 'Stake grabbed. Glasses and bundle on.', cues: [[0, 'loot-grab'], [900, 'bling']] },
+    { art: sprite('thief-run'), ms: 3600, text: 'Run! The head start is ticking.', cues: [[0, 'heist-start'], [500, 'dash']], loops: [['run-loop', 500, 3600], ['footsteps-loop', 500, 3600]] },
+    { art: sprite('swag'), ms: 4500, text: 'Deadline passed. The loot is yours.', cues: [[0, 'swag'], [2850, 'jackpot']] },
+  ] },
+  { title: 'Thief gets caught', note: 'Your avatar: run, busted, loses the bond', steps: () => [
+    { art: sprite('thief-run'), ms: 3000, text: 'Running with the loot...', loops: [['run-loop', 0, 3000], ['footsteps-loop', 0, 3000]] },
+    { art: sprite('caught'), ms: 2600, text: 'Busted! The victim found you.', cues: [[0, 'bang'], [150, 'caught'], [1300, 'coin-drop']] },
+  ] },
+  { title: 'Victim loses the stake', note: 'Your avatar: alert, hunt, too late, cries', steps: () => [
+    { art: sprite('alert'), ms: 2640, text: 'You have been robbed!', cues: [[0, 'robbed']], loops: [['alert', 1100, 2640]] },
+    { art: sprite('hunt'), ms: 4000, text: 'Hunting. Time is running out.', cues: [[0, 'radar-ping'], [1000, 'tick'], [1500, 'radar-ping'], [2000, 'tick'], [2600, 'tick-urgent'], [3000, 'tick-urgent'], [3400, 'tick-urgent'], [3800, 'tick-urgent']] },
+    { art: sprite('cry'), ms: 5500, text: 'Too late. The stake is gone.', cues: [[0, 'stake-lost'], [1200, 'tear']], loops: [['cry', 1400, 5480]] },
+  ] },
+  { title: 'Victim catches the thief', note: 'Your avatar: alert, hunt, thief in range, saved', steps: () => [
+    { art: sprite('alert'), ms: 1760, text: 'You have been robbed!', cues: [[0, 'bang']], loops: [['alert', 0, 1760]] },
+    { art: sprite('hunt'), ms: 3200, text: 'Hunting... signal getting stronger.', cues: [[0, 'radar-ping'], [1100, 'radar-ping'], [2100, 'thief-near'], [2600, 'thief-near']] },
+    { art: sprite('saved'), ms: 2600, text: 'Caught! Stake back, plus the bond.', cues: [[0, 'saved'], [1200, 'coin'], [1500, 'coin']] },
+  ] },
+  { title: 'Level up', note: 'Your avatar: rookie to prowler to phantom', steps: () => [1, 2, 3].map((level, i) => (
+    { art: sprite('idle', level), ms: 1800, text: `Level ${level}`, cues: i ? [[0, 'level-up']] : [[0, 'ui-click']] }
+  )) },
+];
+
+// Tapping a state previews it with the sound that belongs to it.
+const STATES = {
+  idle: 'ui-click', seated: 'coin', sneak: 'sneak-loop', thief: 'bling', run: 'footsteps-loop', 'thief-run': 'run-loop',
+  swag: 'swag', cry: 'cry', caught: 'caught', saved: 'saved', alert: 'alert', hunt: 'radar-ping', locked: 'ui-deny',
+};
+
+// ---------- audio ----------
+let ctx;
+const buffers = {};
+const live = new Set();
+const load = (name) => (buffers[name] ??= fetch(`../sfx/${name}.wav`).then((r) => {
+  if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
+  return r.arrayBuffer();
+}).then((b) => ctx.decodeAudioData(b)));
+
+async function sound(name, loop = false) {
+  const buffer = await load(name);
+  const src = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  gain.gain.value = 0.7;
+  src.buffer = buffer;
+  src.loop = loop;
+  src.connect(gain).connect(ctx.destination);
+  src.onended = () => live.delete(src);
+  live.add(src);
+  src.start();
+  return src;
+}
+
+// ---------- playback ----------
+let run = 0;
+let timers = [];
+let tickBar = 0;
+let started = 0;
+const later = (ms, fn) => timers.push(setTimeout(fn, ms));
+const stamp = () => ((performance.now() - started) / 1000).toFixed(2).padStart(5, '0');
+function log(text) {
+  const line = document.createElement('div');
+  line.textContent = `${stamp()}s  ${text}`;
+  $('log').append(line);
+  $('log').scrollTop = 1e6;
+}
+function halt() {
+  run++;
+  timers.forEach(clearTimeout);
+  timers = [];
+  cancelAnimationFrame(tickBar);
+  live.forEach((s) => { try { s.stop(); } catch {} });
+  live.clear();
+  document.querySelectorAll('[aria-pressed=true].play').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+}
+const art = (url) => { $('screen').src = `${url}?r=${Math.random()}`; }; // a fresh URL restarts the animation from frame one
+
+async function play(steps, title, button) {
+  halt();
+  const mine = run;
+  ctx ??= new (window.AudioContext || window.webkitAudioContext)();
+  ctx.resume(); // must happen during the click
+  button?.setAttribute('aria-pressed', 'true');
+  $('log').textContent = '';
+  $('caption').textContent = 'Loading...';
+  try {
+    // Load everything first so sounds and animation start together.
+    const names = steps.flatMap((s) => [...(s.cues ?? []).map((c) => c[1]), ...(s.loops ?? []).map((l) => l[0])]);
+    await Promise.all(names.map(load));
+    await Promise.all(steps.map((s) => new Promise((ok, no) => { const i = new Image(); i.onload = ok; i.onerror = () => no(new Error(`Missing art ${s.art}`)); i.src = s.art; })));
+  } catch (err) {
+    if (mine === run) { $('caption').textContent = `Could not load: ${err.message}`; button?.setAttribute('aria-pressed', 'false'); }
+    return;
+  }
+  if (mine !== run) return;
+  started = performance.now();
+  log(`START ${title}`);
+  let offset = 0;
+  steps.forEach((s) => {
+    later(offset, () => { art(s.art); $('caption').textContent = s.text; });
+    (s.cues ?? []).forEach(([at, name]) => later(offset + at, () => { log(name); sound(name); }));
+    (s.loops ?? []).forEach(([name, from, to]) => {
+      let src;
+      later(offset + from, async () => { log(`${name} (loop on)`); src = await sound(name, true); });
+      later(offset + to, () => { log(`${name} (loop off)`); try { src?.stop(); } catch {} });
+    });
+    offset += s.ms;
+  });
+  const total = offset;
+  const frame = () => {
+    $('bar').style.width = `${Math.min(100, ((performance.now() - started) / total) * 100)}%`;
+    if (performance.now() - started < total) tickBar = requestAnimationFrame(frame);
+  };
+  frame();
+  later(total, () => {
+    log('END');
+    live.forEach((s) => { try { s.stop(); } catch {} });
+    $('caption').textContent = 'Finished. Pick another.';
+    button?.setAttribute('aria-pressed', 'false');
+  });
+}
+
+// ---------- controls ----------
+function choiceRow(host, options, key) {
+  options.forEach(([value, label]) => {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = label;
+    b.setAttribute('aria-pressed', pick[key] === value);
+    b.onclick = () => {
+      pick[key] = value;
+      [...host.children].forEach((c) => c.setAttribute('aria-pressed', c === b));
+      drawTiles();
+    };
+    host.append(b);
+  });
+}
+choiceRow($('avatars'), [['juno', 'Juno'], ['rocco', 'Rocco'], ['nib', 'Nib']], 'avatar');
+choiceRow($('levels'), [[1, 'LV 1'], [2, 'LV 2'], [3, 'LV 3']], 'level');
+
+SCENARIOS.forEach((s) => {
+  const b = document.createElement('button');
+  b.className = 'btn play';
+  b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = `${s.title}<small>${s.note}</small>`;
+  b.onclick = () => play(s.steps(), s.title, b);
+  $('scenarios').append(b);
+});
+
+function drawTiles() {
+  $('tiles').textContent = '';
+  Object.entries(STATES).forEach(([state, name]) => {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.innerHTML = `<img alt="" src="${sprite(state)}">${state}`;
+    b.onclick = () => {
+      const looping = name.endsWith('-loop') || name === 'alert';
+      const step = { art: sprite(state), ms: 3000, text: `${state}: ${name}` };
+      if (looping) step.loops = [[name, 0, 3000]];
+      else step.cues = [[0, name]];
+      play([step], state);
+    };
+    $('tiles').append(b);
+  });
+}
+drawTiles();
+
+$('stop').onclick = () => { halt(); $('caption').textContent = 'Stopped.'; };
+art(sprite('idle'));
+</script>
