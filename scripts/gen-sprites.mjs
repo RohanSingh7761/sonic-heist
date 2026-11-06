@@ -1007,18 +1007,15 @@ function heistThiefView() {
   write('scenes/heist-thief-view.svg', sceneSvg('heistthief', W, H, roomBackground(), frames));
 }
 
-function runAll() {
-  const w = 240;
-  const h = 112;
-  const FLOOR_Y = 58;
-  const tile = 56;
-  // Wall tiles every 56px so it can slide and loop, slower than the floor for depth.
-  const wall = new Canvas(w + tile, FLOOR_Y);
-  for (let y = 0; y < FLOOR_Y; y++)
-    for (let x = 0; x < w + tile; x++) {
+const WALL_PAL = { ...FLOOR, 9: '#4a3550', a: '#5c4464', b: '#3b2a42' };
+// Wall tiles every 56px so it can slide and loop.
+function wallCanvas(w, floorY) {
+  const wall = new Canvas(w, floorY);
+  for (let y = 0; y < floorY; y++)
+    for (let x = 0; x < w; x++) {
       const row = Math.floor(y / 7);
       const mortar = y % 7 === 6 || (x + (row % 2) * 14) % 28 === 0;
-      wall.px[y][x] = y > FLOOR_Y - 6 ? '4' : mortar ? 'b' : (x + row * 9) % 56 < 10 ? 'a' : '9';
+      wall.px[y][x] = y > floorY - 6 ? '4' : mortar ? 'b' : (x + row * 9) % 56 < 10 ? 'a' : '9';
     }
   const LAMP = grid(`
 ..KKKKKKK..
@@ -1028,11 +1025,20 @@ KYZwwwwwZyK
 KYZZZZZZZyK
 .KYYYYYYyK.
 ..KKKKKKK..`);
-  for (let x = 20; x < w + tile; x += tile) {
+  for (let x = 20; x < w; x += 56) {
     wall.draw(LAMP, x, 12);
     for (let i = 0; i < 6; i++) wall.dot(x + 5, i + 6, 'K');
   }
-  const pal = { ...FLOOR, 9: '#4a3550', a: '#5c4464', b: '#3b2a42' };
+  return wall;
+}
+
+function runAll() {
+  const w = 240;
+  const h = 112;
+  const FLOOR_Y = 58;
+  const tile = 56;
+  const wall = wallCanvas(w + tile, FLOOR_Y);
+  const pal = WALL_PAL;
   const runners = [
     { name: 'rocco', li: 1, state: 'thief-run', x: 176, y: 56, ph: 0 },
     { name: 'juno', li: 0, state: 'run', x: 112, y: 42, ph: 1 },
@@ -1060,6 +1066,76 @@ KYZZZZZZZyK
 tableIdle();
 heistThiefView();
 runAll();
+
+// ---------- layers for the app UI ----------
+// The app composes these with whichever avatars are playing, so the cast is never baked in.
+const still = (w, h, body) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w * 4}" height="${h * 4}" shape-rendering="crispEdges">${body}</svg>`;
+
+function uiLayers() {
+  write('scenes/room.svg', still(W, H, roomBackground()));
+  write('scenes/table.svg', still(W, H, TABLE.build()));
+  write('scenes/wall-tile.svg', still(56, 58, wallCanvas(56, 58).svg(WALL_PAL)));
+  write('scenes/floor-tile.svg', still(56, 54, planks(56, 54).svg(FLOOR)));
+  write('props/chair.svg', still(S, S, emptyChair.build()));
+  for (let n = 0; n <= 4; n++) write(`props/stack-${n}.svg`, still(13, 16, coinStack(n).build()));
+
+  // Radar: pixel rings with a sweep that turns in 16 steps.
+  const RADAR_PAL = { ...BASE, 1: '#17332f', 2: '#2fb3ad', 3: '#1f5f58', 4: '#7df0e3' };
+  const R = 48;
+  const bg = new Canvas(97, 97);
+  ellipse(bg, R, R, 46, 46, '1');
+  [15, 30].forEach((r) => {
+    for (let a = 0; a < 720; a++) bg.dot(R + Math.round(Math.cos((a * Math.PI) / 360) * r), R + Math.round(Math.sin((a * Math.PI) / 360) * r), '3');
+  });
+  for (let i = -44; i <= 44; i++) {
+    bg.dot(R + i, R, '3');
+    bg.dot(R, R + i, '3');
+  }
+  const frames = Array.from({ length: 16 }, (_, f) => {
+    const sweep = new Canvas(97, 97);
+    for (let trail = 3; trail >= 0; trail--) {
+      const ang = ((f * 22.5 - trail * 7) * Math.PI) / 180;
+      for (let r = 2; r < 45; r++) sweep.dot(R + Math.round(Math.cos(ang) * r), R + Math.round(Math.sin(ang) * r), trail ? '2' : '4');
+    }
+    return [{ key: `sweep${f}`, build: () => sweep.svg(RADAR_PAL), x: 0, y: 0, sw: 97 }];
+  });
+  write('scenes/radar.svg', sceneSvg('radar', 97, 97, bg.svg(RADAR_PAL), frames));
+
+  // Logo: SONIC ripples like a sound wave above a steady HEIST.
+  const GLYPH = {
+    S: ['.XXXX', 'X....', 'X....', '.XXX.', '....X', '....X', 'XXXX.'],
+    O: ['.XXX.', 'X...X', 'X...X', 'X...X', 'X...X', 'X...X', '.XXX.'],
+    N: ['X...X', 'XX..X', 'X.X.X', 'X..XX', 'X...X', 'X...X', 'X...X'],
+    I: ['XXXXX', '..X..', '..X..', '..X..', '..X..', '..X..', 'XXXXX'],
+    C: ['.XXXX', 'X....', 'X....', 'X....', 'X....', 'X....', '.XXXX'],
+    H: ['X...X', 'X...X', 'X...X', 'XXXXX', 'X...X', 'X...X', 'X...X'],
+    E: ['XXXXX', 'X....', 'X....', 'XXXX.', 'X....', 'X....', 'XXXXX'],
+    T: ['XXXXX', '..X..', '..X..', '..X..', '..X..', '..X..', '..X..'],
+  };
+  const LOGO_PAL = { ...BASE, 1: '#b8fff3', 2: '#2fb3ad', 3: '#1c7f79', 4: '#ffc2bd', 5: '#e5484d', 6: '#a92f3c' };
+  // Every glyph pixel is drawn 2 wide so the wordmark has weight at small sizes.
+  const word = (c, text, x0, y0, tones, offset) => {
+    [...text].forEach((ch, i) => {
+      const x = x0 + i * 8;
+      const y = y0 + offset(i);
+      const each = (fn) => GLYPH[ch].forEach((row, j) => [...row].forEach((v, k) => {
+        if (v === 'X') { fn(x + k, y + j, j); if (k === 4 || row[k + 1] !== 'X') fn(x + k + 1, y + j, j); }
+      }));
+      each((px, py) => {
+        for (let dy = -1; dy <= 2; dy++) for (let dx = -1; dx <= 1; dx++) if (c.px[py + dy]?.[px + dx] == null) c.dot(px + dx, py + dy, 'K');
+      });
+      each((px, py, j) => c.dot(px, py, tones[j === 0 ? 0 : j > 4 ? 2 : 1]));
+    });
+  };
+  const logoFrames = Array.from({ length: 10 }, (_, f) => {
+    const c = new Canvas(44, 24);
+    word(c, 'SONIC', 2, 2, ['1', '2', '3'], (i) => Math.round(Math.sin((f / 10 + i / 5) * 2 * Math.PI)));
+    word(c, 'HEIST', 2, 14, ['4', '5', '6'], () => 0);
+    return { body: c.svg(LOGO_PAL), ms: 110 };
+  });
+  write('logo.svg', flipbook('logo', 44, 24, logoFrames));
+}
+uiLayers();
 
 // ---------- gallery ----------
 const stateNames = [...Object.keys(STATES), 'locked'];

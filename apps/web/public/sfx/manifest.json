@@ -1,0 +1,198 @@
+[
+  {
+    "name": "coin",
+    "group": "Money",
+    "seconds": 0.36,
+    "loops": false,
+    "description": "One coin picked up"
+  },
+  {
+    "name": "coin-drop",
+    "group": "Money",
+    "seconds": 0.62,
+    "loops": false,
+    "description": "Coins bouncing on the floor"
+  },
+  {
+    "name": "loot-grab",
+    "group": "Money",
+    "seconds": 0.85,
+    "loops": false,
+    "description": "Thief scoops the victim's stake"
+  },
+  {
+    "name": "deposit",
+    "group": "Money",
+    "seconds": 0.55,
+    "loops": false,
+    "description": "ETH going into the vault"
+  },
+  {
+    "name": "jackpot",
+    "group": "Money",
+    "seconds": 1.65,
+    "loops": false,
+    "description": "Big payout: loot claimed"
+  },
+  {
+    "name": "stake-lost",
+    "group": "Money",
+    "seconds": 1.4,
+    "loops": false,
+    "description": "Your stake is gone"
+  },
+  {
+    "name": "footsteps-loop",
+    "group": "Running",
+    "seconds": 0.44,
+    "loops": true,
+    "description": "Feet only. Matches the run sprite cycle"
+  },
+  {
+    "name": "run-loop",
+    "group": "Running",
+    "seconds": 2.88,
+    "loops": true,
+    "description": "Chase theme for the group run"
+  },
+  {
+    "name": "sneak-loop",
+    "group": "Running",
+    "seconds": 1.52,
+    "loops": true,
+    "description": "Tiptoe pluck. Matches the sneak sprite cycle"
+  },
+  {
+    "name": "dash",
+    "group": "Running",
+    "seconds": 0.46,
+    "loops": false,
+    "description": "Whoosh as the thief takes off"
+  },
+  {
+    "name": "heist-start",
+    "group": "Running",
+    "seconds": 0.8,
+    "loops": false,
+    "description": "Sting when the loot lands on-chain"
+  },
+  {
+    "name": "cry",
+    "group": "Crying",
+    "seconds": 2.04,
+    "loops": true,
+    "description": "Three wails and hiccups. Matches the cry sprite cycle"
+  },
+  {
+    "name": "tear",
+    "group": "Crying",
+    "seconds": 0.2,
+    "loops": false,
+    "description": "A single tear plip"
+  },
+  {
+    "name": "swag",
+    "group": "Swag",
+    "seconds": 2.85,
+    "loops": true,
+    "description": "Shades whistle down, thunk, then the groove. Matches the swag sprite cycle"
+  },
+  {
+    "name": "bling",
+    "group": "Swag",
+    "seconds": 0.55,
+    "loops": false,
+    "description": "Sparkle off the glasses or chain"
+  },
+  {
+    "name": "alert",
+    "group": "Alert",
+    "seconds": 0.88,
+    "loops": true,
+    "description": "Two-tone siren: you have been robbed. Matches the alert sprite cycle"
+  },
+  {
+    "name": "bang",
+    "group": "Alert",
+    "seconds": 0.32,
+    "loops": false,
+    "description": "The red \"!\" popping up"
+  },
+  {
+    "name": "robbed",
+    "group": "Alert",
+    "seconds": 1.1,
+    "loops": false,
+    "description": "Reveal sting before the hunt starts"
+  },
+  {
+    "name": "tick",
+    "group": "Alert",
+    "seconds": 0.06,
+    "loops": false,
+    "description": "Countdown tick"
+  },
+  {
+    "name": "tick-urgent",
+    "group": "Alert",
+    "seconds": 0.13,
+    "loops": false,
+    "description": "Countdown tick for the final seconds"
+  },
+  {
+    "name": "radar-ping",
+    "group": "Alert",
+    "seconds": 0.5,
+    "loops": false,
+    "description": "Sonar blip with two echoes"
+  },
+  {
+    "name": "thief-near",
+    "group": "Alert",
+    "seconds": 0.22,
+    "loops": false,
+    "description": "Thief in range: hot signal"
+  },
+  {
+    "name": "caught",
+    "group": "Outcomes",
+    "seconds": 1.15,
+    "loops": false,
+    "description": "Thief busted: bonk, then the fall"
+  },
+  {
+    "name": "saved",
+    "group": "Outcomes",
+    "seconds": 1.2,
+    "loops": false,
+    "description": "Victim got it all back, plus the bond"
+  },
+  {
+    "name": "level-up",
+    "group": "Outcomes",
+    "seconds": 1.05,
+    "loops": false,
+    "description": "Avatar reached a new level"
+  },
+  {
+    "name": "ui-click",
+    "group": "Outcomes",
+    "seconds": 0.05,
+    "loops": false,
+    "description": "Button press"
+  },
+  {
+    "name": "ui-deny",
+    "group": "Outcomes",
+    "seconds": 0.26,
+    "loops": false,
+    "description": "Not allowed: cooldown, immune, locked"
+  },
+  {
+    "name": "shield-on",
+    "group": "Outcomes",
+    "seconds": 0.5,
+    "loops": false,
+    "description": "Shield mode turned on"
+  }
+]

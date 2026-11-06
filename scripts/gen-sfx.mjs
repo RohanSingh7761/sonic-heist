@@ -315,6 +315,9 @@ const declared = /SFX_NAMES = \[(.*?)\]/s.exec(readFileSync(join(ROOT, 'apps/web
 const missing = [...declared.filter((n) => !SOUNDS[n]), ...Object.keys(SOUNDS).filter((n) => !declared.includes(n))];
 if (missing.length) throw new Error(`soundFX.ts SFX_NAMES out of sync: ${missing.join(', ')}`);
 
+// Sound details for scripts/gen-docs.mjs.
+writeFileSync(join(OUT, 'manifest.json'), `${JSON.stringify(Object.entries(SOUNDS).map(([name, [seconds, group, , loops, description]]) => ({ name, group, seconds, loops, description })), null, 2)}\n`);
+
 // ---------- soundboard ----------
 const groups = [...new Set(Object.values(SOUNDS).map((v) => v[1]))];
 const html = `<!doctype html><meta charset="utf-8"><title>Sonic Heist Sounds</title>
