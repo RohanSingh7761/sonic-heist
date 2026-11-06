@@ -692,7 +692,7 @@ export function UiApp() {
       <DemoControls {...p} />
 
       {/* Requirement 2: Login / Signup Modal */}
-      {showAuthModal && (
+      {showAuthModal && s.view !== 'title' && (
         <AuthModal
           onSuccess={(u) => {
             const cleanUid = parseInt(u.walletAddress.slice(2, 10), 16) >>> 0;

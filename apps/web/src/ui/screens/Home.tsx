@@ -290,6 +290,16 @@ export function Settings({ s, send, audioProtocol = 4, setAudioProtocol, onTestC
         <p className="small-text muted">{CONFIG.chainName}. Testnet only.</p>
         <a href={CONFIG.blockExplorer} target="_blank" rel="noreferrer" style={{ color: 'var(--teal-dark)', wordBreak: 'break-all' }}>{CONFIG.heistVaultAddress}</a>
       </Panel>
+      <Panel>
+        <b>Account</b>
+        <p className="small-text muted">Your wallet stays on the server. Log in again to get it back.</p>
+        <Btn tone="red" small block style={{ marginTop: 8 }} onClick={() => {
+          if (!window.confirm('Log out of Sonic Heist?')) return;
+          // The mic/sound-check flags are per device, so they stay; everything tied to the account goes.
+          ['sonic_heist_user', 'sonic_heist_addr', 'sonic_heist_pk', 'sonic_heist_uid', 'sonic_heist_log'].forEach((k) => localStorage.removeItem(k));
+          window.location.reload(); // Fresh start: drops the wallet client and game state, lands on the title and then login.
+        }}>Log out</Btn>
+      </Panel>
     </main>
   );
 }

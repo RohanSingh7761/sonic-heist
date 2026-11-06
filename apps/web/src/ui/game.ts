@@ -111,9 +111,8 @@ export const initialState = (name: string): GameState => {
   const entries = savedLog();
   const micOk = typeof window !== 'undefined' && localStorage.getItem('sonic_mic_ok') === 'true';
   const soundOk = typeof window !== 'undefined' && localStorage.getItem('sonic_sound_ok') === 'true';
-  const ready = micOk && soundOk;
   return {
-    view: ready ? 'table' : 'setup',
+    view: 'title', // Title's Start button routes to setup or table from micOk/soundOk.
     avatar: 'rocco',
     name,
     stake: 0,
