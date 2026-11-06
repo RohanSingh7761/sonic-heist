@@ -27,7 +27,9 @@ export class GgwaveModem {
     { id: 1, name: 'Audible Fast (Recommended)', isUltrasonic: false },
     { id: 2, name: 'Audible Fastest', isUltrasonic: false },
     { id: 0, name: 'Audible Normal', isUltrasonic: false },
-    { id: 4, name: 'Ultrasonic Fast (Quiet)', isUltrasonic: true },
+    { id: 4, name: 'Ultrasound Fast (~16.2 kHz, Inaudible)', isUltrasonic: true },
+    { id: 3, name: 'Ultrasound Normal (~15.8 kHz, Quiet)', isUltrasonic: true },
+    { id: 5, name: 'Ultrasound Fastest (~17.0 kHz, Inaudible)', isUltrasonic: true },
   ];
   public defaultProtocolId = 1;
 
@@ -86,8 +88,14 @@ export class GgwaveModem {
       this.instance = this.ggwave.init(parameters);
     }
 
+    // Resolve proper Emscripten enum object (ggwave requires the enum instance, not a raw JS number)
+    const protoObj =
+      this.ggwave.ProtocolId?.values?.[protocolId] ||
+      this.ggwave.TxProtocolId?.values?.[protocolId] ||
+      protocolId;
+
     // Encode payload into audio waveform
-    const waveform = this.ggwave.encode(this.instance, payload, protocolId, volume);
+    const waveform = this.ggwave.encode(this.instance, payload, protoObj, volume);
     if (!waveform || waveform.length === 0) {
       throw new Error('Failed to encode audio waveform: ggwave returned empty buffer');
     }
