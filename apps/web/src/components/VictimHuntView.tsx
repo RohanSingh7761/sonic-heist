@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { AlertOctagon, Target, Zap, ShieldCheck, Skull, Clock } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { AlertOctagon, Target, Zap, ShieldCheck, Skull, Clock, Radio } from 'lucide-react';
 import { soundFX } from '../game/soundFX';
 
 interface VictimHuntViewProps {
@@ -12,6 +12,8 @@ interface VictimHuntViewProps {
   isThiefInRange: boolean;
   thiefSignalLevel: number; // 0 to 1
   isCancelling: boolean;
+  isPinging?: boolean;
+  onPingThief: () => void;
   onCancelHeist: () => void;
   onTimeoutLoss: () => void;
 }
@@ -26,28 +28,41 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
   isThiefInRange,
   thiefSignalLevel,
   isCancelling,
+  isPinging = false,
+  onPingThief,
   onCancelHeist,
   onTimeoutLoss,
 }) => {
-  const [secondsLeft, setSecondsLeft] = useState(60);
+  const [secondsLeft, setSecondsLeft] = useState(() => {
+    const now = Math.floor(Date.now() / 1000);
+    return Math.max(0, deadline - now);
+  });
+
+  const onTimeoutLossRef = useRef(onTimeoutLoss);
+  useEffect(() => {
+    onTimeoutLossRef.current = onTimeoutLoss;
+  });
 
   useEffect(() => {
     soundFX.playAlarm();
   }, []);
 
+  // Stable countdown timer: ONLY restarts if the deadline changes, NEVER when parent re-renders
   useEffect(() => {
-    const interval = setInterval(() => {
+    const tick = () => {
       const now = Math.floor(Date.now() / 1000);
       const remaining = Math.max(0, deadline - now);
       setSecondsLeft(remaining);
 
-      if (remaining === 0) {
-        onTimeoutLoss();
+      if (remaining <= 0) {
+        onTimeoutLossRef.current();
       }
-    }, 250);
+    };
 
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [deadline, onTimeoutLoss]);
+  }, [deadline]);
 
   // Closeness bar text & segments
   const getClosenessState = (lvl: number) => {
@@ -82,12 +97,12 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
           00:{secondsLeft.toString().padStart(2, '0')}
         </div>
         <p className="text-xs text-rose-200/90 font-mono mt-1">
-          Physically find the thief and get within 2 meters to cancel!
+          Get physically close to the thief and pulse radar to lock on!
         </p>
       </div>
 
       {/* Target Thief Dossier */}
-      <div className="p-3.5 rounded-xl bg-slate-950/90 border border-rose-500/30 mb-5 space-y-2 font-mono text-xs">
+      <div className="p-3.5 rounded-xl bg-slate-950/90 border border-rose-500/30 mb-4 space-y-2 font-mono text-xs">
         <div className="flex justify-between items-center">
           <span className="text-slate-400">Suspect Codename:</span>
           <span className="text-rose-400 font-black text-sm">{thiefName}</span>
@@ -102,8 +117,24 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
         </div>
       </div>
 
+      {/* Manual Proximity Pulse Radar Button */}
+      <div className="mb-4">
+        <button
+          onClick={onPingThief}
+          disabled={isPinging || isCancelling}
+          className={`w-full py-3 px-4 rounded-xl font-mono text-xs font-bold border flex items-center justify-center gap-2 transition-all ${
+            isPinging
+              ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50 cursor-wait animate-pulse'
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-600/30'
+          }`}
+        >
+          <Radio className={`w-4 h-4 ${isPinging ? 'animate-spin' : 'animate-pulse'}`} />
+          <span>{isPinging ? 'EMITTING HUNT SIGNAL...' : '📡 PULSE RADAR TO LOCATE THIEF'}</span>
+        </button>
+      </div>
+
       {/* Closeness Radar Meter */}
-      <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 mb-6">
+      <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 mb-5">
         <div className="flex justify-between items-center text-xs font-mono mb-2">
           <span className="text-slate-400 flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-rose-400" />
@@ -149,13 +180,13 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
             ? 'EXECUTING ULTRASOUND HANDSHAKE...'
             : isThiefInRange
             ? 'CANCEL HEIST & CLAIM THIEF BOND!'
-            : 'GET CLOSER TO THIEF TO CANCEL'}
+            : 'PULSE RADAR WITHIN 2 METERS TO UNLOCK'}
         </span>
       </button>
 
       {isThiefInRange && !isCancelling && (
         <p className="text-[11px] text-emerald-400 font-mono text-center mt-2.5 font-bold animate-pulse">
-          🎯 IN ULTRASOUND RANGE! TAP CANCEL TO RECOVER LOOT + WIN BOND!
+          🎯 THIEF IN RANGE! TAP CANCEL TO RECOVER LOOT + WIN BOND!
         </p>
       )}
     </div>

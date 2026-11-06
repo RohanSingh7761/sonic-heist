@@ -78,6 +78,7 @@ export default function App() {
   // Radar & Nearby Players
   const [nearbyPlayers, setNearbyPlayers] = useState<NearbyPlayer[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<NearbyPlayer | null>(null);
+  const [isVictimPinging, setIsVictimPinging] = useState(false);
 
   // Active Heist States
   const [activeHeistAsThief, setActiveHeistAsThief] = useState<{
@@ -202,7 +203,8 @@ export default function App() {
       // 1. PING received
       case MessageType.PING: {
         const m = msg as PingMessage;
-        if (!isPatrol) {
+        const isRunningAsThief = activeHeistAsThiefRef.current !== null;
+        if (!isPatrol && !isRunningAsThief) {
           addLog(`Ignored PING: Patrol mode is OFF on this device.`, 'warn');
           return;
         }
@@ -211,8 +213,8 @@ export default function App() {
           return;
         }
 
-        // Check if targeted ping or broadcast (targetUid === 0 means broadcast to all)
-        if (m.targetUid === 0 || m.targetUid === currentBurner.uid) {
+        // Check if targeted ping, broadcast, or victim pinging thief
+        if (m.targetUid === 0 || m.targetUid === currentBurner.uid || isRunningAsThief) {
           addLog(`📡 Heard PING from 0x${m.scannerUid.toString(16)}. Answering with PONG...`, 'loot');
           soundFX.playRadarPing();
 
@@ -224,7 +226,7 @@ export default function App() {
             });
             modem.transmit(pong, proto, vol);
             addLog(`Sent PONG reply (UID: 0x${currentBurner.uid.toString(16)}).`, 'info');
-          }, 350);
+          }, 250);
         }
         break;
       }
@@ -248,7 +250,9 @@ export default function App() {
 
         // If currently hunting this thief, update victim closeness!
         if (activeHeistAsVictimRef.current && activeHeistAsVictimRef.current.thiefUid === m.responderUid) {
-          setActiveHeistAsVictim((prev) => prev ? ({ ...prev, isThiefInRange: true, thiefSignalLevel: 0.85 }) : null);
+          soundFX.playCatchLock();
+          addLog(`🎯 Thief detected in acoustic range! Proximity locked!`, 'success');
+          setActiveHeistAsVictim((prev) => prev ? ({ ...prev, isThiefInRange: true, thiefSignalLevel: 1.0 }) : null);
         }
         break;
       }
@@ -290,23 +294,28 @@ export default function App() {
         // Schedule victim notification for 10 seconds later (end of head start)
         const lootAmountEst = vaultEthRef.current * 0.15;
         const bondEst = lootAmountEst * 0.2;
-        const now = Math.floor(Date.now() / 1000);
+        const targetThiefUid = parseInt(m.thiefAddress.slice(2, 10), 16);
 
         setTimeout(() => {
           soundFX.playAlarm();
           setActiveHeistAsVictim({
             lootId: Math.floor(Math.random() * 900) + 100,
-            thiefName: getPlayerName(parseInt(m.thiefAddress.slice(2, 10), 16)),
-            thiefUid: parseInt(m.thiefAddress.slice(2, 10), 16),
+            thiefName: getPlayerName(targetThiefUid),
+            thiefUid: targetThiefUid,
             lootAmount: lootAmountEst,
             bondAmount: bondEst,
-            deadline: now + 10 + 60,
+            deadline: Math.floor(Date.now() / 1000) + 60,
             isThiefInRange: false,
-            thiefSignalLevel: 0.2,
+            thiefSignalLevel: 0,
             isCancelling: false,
           });
           setVaultEth((prev) => Math.max(0, prev - lootAmountEst));
-          addLog(`🚨 HEAD START ENDED! You were heisted for ${lootAmountEst.toFixed(4)} ETH!`, 'alert');
+          addLog(`🚨 HEAD START ENDED! You were heisted for ${lootAmountEst.toFixed(4)} ETH! Pulse radar to find suspect!`, 'alert');
+
+          // Ensure microphone listening is active on victim phone during hunt
+          if (!isPatrolActiveRef.current) {
+            togglePatrol();
+          }
         }, 10000);
         break;
       }
@@ -335,6 +344,11 @@ export default function App() {
         });
 
         setVaultEth((prev) => Math.max(0, prev - bond));
+
+        // Ensure thief microphone is active so it can receive victim's hunt radar ping
+        if (!isPatrolActiveRef.current) {
+          togglePatrol();
+        }
         break;
       }
 
@@ -372,6 +386,15 @@ export default function App() {
     }
   };
 
+  const lastLevelUpdateRef = useRef(0);
+  const handleLevel = (lvl: number) => {
+    const now = Date.now();
+    if (now - lastLevelUpdateRef.current > 120) {
+      lastLevelUpdateRef.current = now;
+      setMicLevel(lvl);
+    }
+  };
+
   // Toggle Continuous Patrol Service
   const togglePatrol = async () => {
     if (isPatrolActiveRef.current) {
@@ -383,7 +406,7 @@ export default function App() {
       try {
         await modem.startListening(
           (bytes) => handleIncomingAudio(bytes),
-          (lvl) => setMicLevel(lvl)
+          (lvl) => handleLevel(lvl)
         );
         setIsPatrolActive(true);
         isPatrolActiveRef.current = true;
@@ -464,6 +487,36 @@ export default function App() {
 
     await modem.transmit(req, audioProtocol, volume);
     addLog(`LOOT_REQ transmitted. Awaiting consent ticket from target phone...`, 'info');
+  };
+
+  // Victim Manual Radar Pulse Action
+  const handleVictimPing = async () => {
+    if (!activeHeistAsVictimRef.current || isVictimPinging) return;
+    setIsVictimPinging(true);
+    addLog(`📡 Pulsing hunt radar targeting suspect "${activeHeistAsVictimRef.current.thiefName}"...`, 'loot');
+    soundFX.playRadarPing();
+
+    const currentBurner = burnerRef.current;
+    const proto = audioProtocolRef.current;
+    const vol = volumeRef.current;
+    const targetUid = activeHeistAsVictimRef.current.thiefUid;
+
+    const ping = encodePing({
+      scannerUid: currentBurner.uid,
+      nonce: Math.floor(Math.random() * 0xffff),
+      targetUid,
+    });
+
+    try {
+      await modem.transmit(ping, proto, vol);
+      addLog(`Hunt radar pulse sent. Listening for thief acoustic reflection...`, 'info');
+    } catch (err: any) {
+      addLog(`Radar pulse error: ${err.message}`, 'warn');
+    }
+
+    setTimeout(() => {
+      setIsVictimPinging(false);
+    }, 1800);
   };
 
   // Victim Cancel Action
@@ -568,6 +621,8 @@ export default function App() {
               isThiefInRange={activeHeistAsVictim.isThiefInRange}
               thiefSignalLevel={activeHeistAsVictim.thiefSignalLevel}
               isCancelling={activeHeistAsVictim.isCancelling}
+              isPinging={isVictimPinging}
+              onPingThief={handleVictimPing}
               onCancelHeist={handleVictimCancel}
               onTimeoutLoss={() => {
                 addLog('HUNT WINDOW EXPIRED! Loot lost to thief.', 'alert');
