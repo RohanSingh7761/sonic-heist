@@ -1,106 +1,144 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Volume2,
-  Mic,
-  MicOff,
+  Skull,
+  Shield,
   Radio,
-  CheckCircle2,
-  AlertCircle,
-  ArrowRight,
+  Zap,
+  Target,
   Wifi,
   WifiOff,
-  RotateCcw,
-  Sparkles,
-  ShieldCheck,
-  Send
+  Volume2,
+  RefreshCw,
+  Award,
+  AlertTriangle
 } from 'lucide-react';
-import { modem, GgwaveProtocol } from './audio/ggwaveModem';
+import { modem } from './audio/ggwaveModem';
 import {
-  createMockPayment,
-  packPayment,
-  unpackPayment,
-  packAck,
-  unpackAck,
-  PaymentData,
-  AckData,
-  STATUS_NAMES,
+  MessageType,
+  PingMessage,
+  PongMessage,
+  LootReqMessage,
+  TicketMessage,
+  CatchMessage,
+  CaughtMessage,
+} from './protocol/types';
+import {
+  decodeHeistMessage,
+  encodePing,
+  encodePong,
+  encodeLootReq,
+  encodeTicket,
+  encodeCatch,
+  encodeCaught,
+} from './protocol/codecs';
+import {
+  getPlayerName,
   bytesToHex,
-} from './audio/mockPayload';
+  hexToBytes,
+  toCompactSignature,
+  splitCompactSignature,
+} from './protocol/signatures';
+import { RadarSweep, NearbyPlayer } from './components/RadarSweep';
+import { VaultCard } from './components/VaultCard';
+import { ThiefRunView } from './components/ThiefRunView';
+import { VictimHuntView } from './components/VictimHuntView';
+import { ActivityLog, GameLogEntry } from './components/ActivityLog';
+import { soundFX } from './game/soundFX';
+
+// Simple deterministic burner account generation for demo
+function getOrCreateBurner() {
+  let addr = localStorage.getItem('sonic_heist_addr');
+  let uid = localStorage.getItem('sonic_heist_uid');
+  if (!addr || !uid) {
+    const randomHex = Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    addr = `0x${randomHex}`;
+    const cleanUid = Math.floor(Math.random() * 0xffffffff) >>> 0;
+    localStorage.setItem('sonic_heist_addr', addr);
+    localStorage.setItem('sonic_heist_uid', cleanUid.toString());
+    uid = cleanUid.toString();
+  }
+  return { address: addr as `0x${string}`, uid: parseInt(uid) };
+}
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'transmitter' | 'receiver' | 'loopback'>('transmitter');
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-  const [isListening, setIsListening] = useState<boolean>(false);
-  const [isTransmitting, setIsTransmitting] = useState<boolean>(false);
-  const [protocols, setProtocols] = useState<GgwaveProtocol[]>([]);
-  const [selectedProtocol, setSelectedProtocol] = useState<number>(1);
-  const [volume, setVolume] = useState<number>(30);
-  const [micLevel, setMicLevel] = useState<number>(0);
-  const [txDuration, setTxDuration] = useState<number | null>(null);
+  const [burner, setBurner] = useState(getOrCreateBurner());
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isPatrolActive, setIsPatrolActive] = useState(false);
+  const [isShielded, setIsShielded] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
 
-  // Payloads
-  const [mockPayment, setMockPayment] = useState<PaymentData>(createMockPayment());
-  const [usdcAmountInput, setUsdcAmountInput] = useState<string>('1.0');
-  const [feeInput, setFeeInput] = useState<string>('0.01');
-  const [receivedPayments, setReceivedPayments] = useState<{ timestamp: string; data: PaymentData; rawHex: string }[]>([]);
-  const [receivedAcks, setReceivedAcks] = useState<{ timestamp: string; data: AckData }[]>([]);
-  const [logs, setLogs] = useState<{ time: string; msg: string; type: 'info' | 'success' | 'warn' | 'error' }[]>([]);
+  // Vault balances
+  const [vaultEth, setVaultEth] = useState(1.5);
+  const [walletEth, setWalletEth] = useState(0.045);
+  const [immunitySeconds, setImmunitySeconds] = useState(0);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
-  const packedPaymentBytes = React.useMemo(() => packPayment(mockPayment), [mockPayment]);
+  // Radar & Nearby Players
+  const [nearbyPlayers, setNearbyPlayers] = useState<NearbyPlayer[]>([]);
+  const [selectedTarget, setSelectedTarget] = useState<NearbyPlayer | null>(null);
 
-  const handleAmountChange = (valStr: string) => {
-    setUsdcAmountInput(valStr);
-    const parsed = parseFloat(valStr);
-    if (!isNaN(parsed) && parsed >= 0) {
-      setMockPayment((prev) => ({
-        ...prev,
-        amount: BigInt(Math.round(parsed * 1e6)),
-      }));
-    }
+  // Active Heist States
+  const [activeHeistAsThief, setActiveHeistAsThief] = useState<{
+    lootId: number;
+    victimName: string;
+    victimUid: number;
+    lootAmount: number;
+    bondAmount: number;
+    startedAt: number;
+    revealAt: number;
+    deadline: number;
+    isCaught: boolean;
+  } | null>(null);
+
+  const [activeHeistAsVictim, setActiveHeistAsVictim] = useState<{
+    lootId: number;
+    thiefName: string;
+    thiefUid: number;
+    lootAmount: number;
+    bondAmount: number;
+    deadline: number;
+    isThiefInRange: boolean;
+    thiefSignalLevel: number;
+    isCancelling: boolean;
+  } | null>(null);
+
+  // Protocol & Audio Settings
+  const [audioProtocol, setAudioProtocol] = useState<number>(4); // Default: Ultrasound Fast (16.2 kHz)
+  const [volume, setVolume] = useState<number>(35);
+  const [logs, setLogs] = useState<GameLogEntry[]>([]);
+
+  const addLog = (text: string, type: GameLogEntry['type'] = 'info') => {
+    const time = new Date().toLocaleTimeString();
+    setLogs((prev) => [{ id: Math.random().toString(), time, text, type }, ...prev.slice(0, 49)]);
   };
 
-  const handleFeeChange = (valStr: string) => {
-    setFeeInput(valStr);
-    const parsed = parseFloat(valStr);
-    if (!isNaN(parsed) && parsed >= 0) {
-      setMockPayment((prev) => ({
-        ...prev,
-        fee: Math.round(parsed * 1e6),
-      }));
-    }
-  };
-
-  const handleRandomizeUid = () => {
-    const newUid = Math.floor(Math.random() * 0xffff) + 1;
-    const newSalt = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
-    setMockPayment((prev) => ({
-      ...prev,
-      uid: newUid,
-      salt: newSalt,
-    }));
-    addLog(`Generated new payment UID: 0x${newUid.toString(16).toUpperCase()}`, 'info');
-  };
-
-  // Online / Offline listener
+  // Online / Offline monitor
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
     };
   }, []);
 
-  // Initialize modem & protocols on mount
+  // Cooldown countdown timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setImmunitySeconds((prev) => Math.max(0, prev - 1));
+      setCooldownSeconds((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load ggwave library on mount
   useEffect(() => {
     modem.loadLibrary().then(() => {
-      setProtocols(modem.availableProtocols);
-      setSelectedProtocol(modem.defaultProtocolId);
-      addLog('Audio modem library loaded.', 'info');
+      addLog(`Sonic Heist acoustic engine ready (Protocol: 16.2 kHz Ultrasound).`, 'info');
     }).catch((err) => {
-      addLog(`Initialization error: ${err.message}`, 'error');
+      addLog(`Audio init failed: ${err.message}`, 'warn');
     });
 
     return () => {
@@ -108,623 +146,463 @@ export default function App() {
     };
   }, []);
 
-  const addLog = (msg: string, type: 'info' | 'success' | 'warn' | 'error' = 'info') => {
-    const time = new Date().toLocaleTimeString();
-    setLogs((prev) => [{ time, msg, type }, ...prev.slice(0, 49)]);
-  };
+  // Handle Incoming Decoded Sound Messages (The Dumb Pipe Handler)
+  const handleIncomingAudio = (bytes: Uint8Array) => {
+    const msg = decodeHeistMessage(bytes);
+    if (!msg) return;
 
-  // Transmit payment over sound
-  const handleTransmitPayment = async () => {
-    try {
-      setIsTransmitting(true);
-      addLog(`Playing 132-byte payment audio (UID: 0x${mockPayment.uid.toString(16)})...`, 'info');
-      const res = await modem.transmit(packedPaymentBytes, selectedProtocol, volume);
-      setTxDuration(Math.round(res.durationMs));
-      addLog(`Transmission complete (${Math.round(res.durationMs)} ms). Listening for ACK...`, 'success');
-    } catch (err: any) {
-      addLog(`Transmit error: ${err.message}`, 'error');
-    } finally {
-      setIsTransmitting(false);
+    switch (msg.type) {
+      // 1. PING received
+      case MessageType.PING: {
+        const m = msg as PingMessage;
+        if (!isPatrolActive || isShielded) return;
+        // Check if targeted ping or broadcast
+        if (m.targetUid === 0 || m.targetUid === burner.uid) {
+          addLog(`Heard PING from 0x${m.scannerUid.toString(16)}. Answering with PONG...`, 'info');
+          // Reply with PONG after brief random slot
+          setTimeout(() => {
+            const pong = encodePong({
+              responderUid: burner.uid,
+              echoNonce: m.nonce,
+            });
+            modem.transmit(pong, audioProtocol, volume);
+          }, Math.floor(Math.random() * 800) + 100);
+        }
+        break;
+      }
+
+      // 2. PONG received
+      case MessageType.PONG: {
+        const m = msg as PongMessage;
+        soundFX.playRadarPing();
+        const pName = getPlayerName(m.responderUid);
+        addLog(`Discovered nearby player: "${pName}" (UID: 0x${m.responderUid.toString(16)})`, 'success');
+
+        setNearbyPlayers((prev) => {
+          const exists = prev.find((p) => p.uid === m.responderUid);
+          const sig = Math.random() * 0.4 + 0.5; // Estimated proximity level
+          if (exists) {
+            return prev.map((p) => (p.uid === m.responderUid ? { ...p, signalLevel: sig, lastSeen: Date.now() } : p));
+          }
+          return [...prev, { uid: m.responderUid, name: pName, signalLevel: sig, lastSeen: Date.now() }];
+        });
+
+        // If currently hunting this thief, update victim closeness!
+        if (activeHeistAsVictim && activeHeistAsVictim.thiefUid === m.responderUid) {
+          setActiveHeistAsVictim((prev) => prev ? ({ ...prev, isThiefInRange: true, thiefSignalLevel: 0.85 }) : null);
+        }
+        break;
+      }
+
+      // 3. LOOT_REQ received (Victim targeted)
+      case MessageType.LOOT_REQ: {
+        const m = msg as LootReqMessage;
+        if (!isPatrolActive || isShielded) return;
+        if (m.victimUid !== burner.uid) return;
+        if (immunitySeconds > 0) {
+          addLog(`Rejected LOOT_REQ: currently immune.`, 'warn');
+          return;
+        }
+
+        addLog(`Targeted by thief ${m.thiefAddress.slice(0, 8)}... Auto-signing consent ticket.`, 'loot');
+
+        // Auto-sign mock ticket
+        const ticketNonce = BigInt(Math.floor(Math.random() * 100000) + 1);
+        const validBefore = Math.floor(Date.now() / 1000) + 90;
+        const dummyCompactSig = new Uint8Array(64).fill(0x55);
+
+        const ticketBytes = encodeTicket({
+          thiefUid: parseInt(m.thiefAddress.slice(2, 10), 16),
+          nonce: ticketNonce,
+          validBefore,
+          signature: dummyCompactSig,
+        });
+
+        // Transmit ticket back over ultrasound
+        modem.transmit(ticketBytes, audioProtocol, volume);
+
+        // Schedule victim notification for 10 seconds later (end of head start)
+        const lootAmountEst = vaultEth * 0.15;
+        const bondEst = lootAmountEst * 0.2;
+        const now = Math.floor(Date.now() / 1000);
+
+        setTimeout(() => {
+          soundFX.playAlarm();
+          setActiveHeistAsVictim({
+            lootId: Math.floor(Math.random() * 900) + 100,
+            thiefName: getPlayerName(parseInt(m.thiefAddress.slice(2, 10), 16)),
+            thiefUid: parseInt(m.thiefAddress.slice(2, 10), 16),
+            lootAmount: lootAmountEst,
+            bondAmount: bondEst,
+            deadline: now + 10 + 60,
+            isThiefInRange: false,
+            thiefSignalLevel: 0.2,
+            isCancelling: false,
+          });
+          setVaultEth((prev) => Math.max(0, prev - lootAmountEst));
+          addLog(`🚨 HEAD START ENDED! You were heisted for ${lootAmountEst.toFixed(4)} ETH!`, 'alert');
+        }, 10000);
+        break;
+      }
+
+      // 4. TICKET received (Thief side)
+      case MessageType.TICKET: {
+        const m = msg as TicketMessage;
+        if (m.thiefUid !== burner.uid) return;
+        addLog(`Received valid consent ticket from victim! Submitting startLoot on-chain...`, 'loot');
+
+        // Enter Thief Run mode
+        const loot = vaultEth * 0.18;
+        const bond = loot * 0.2;
+        const now = Math.floor(Date.now() / 1000);
+
+        setActiveHeistAsThief({
+          lootId: Math.floor(Math.random() * 900) + 100,
+          victimName: selectedTarget ? selectedTarget.name : 'Unknown Victim',
+          victimUid: selectedTarget ? selectedTarget.uid : 0,
+          lootAmount: loot,
+          bondAmount: bond,
+          startedAt: now,
+          revealAt: now + 10,
+          deadline: now + 10 + 60,
+          isCaught: false,
+        });
+
+        setVaultEth((prev) => Math.max(0, prev - bond));
+        break;
+      }
+
+      // 5. CATCH received (Thief side caught by hunting victim)
+      case MessageType.CATCH: {
+        const m = msg as CatchMessage;
+        if (!activeHeistAsThief) return;
+        addLog(`Victim physically reached ultrasound range and sent CATCH! Auto-signing CAUGHT...`, 'alert');
+        soundFX.playAlarm();
+
+        // Echo CAUGHT signature over ultrasound
+        const caughtBytes = encodeCaught({
+          lootId: m.lootId,
+          challenge: m.challenge,
+          signature: new Uint8Array(64).fill(0x77),
+        });
+
+        modem.transmit(caughtBytes, audioProtocol, volume);
+        setActiveHeistAsThief((prev) => prev ? ({ ...prev, isCaught: true }) : null);
+        break;
+      }
+
+      // 6. CAUGHT received (Victim side)
+      case MessageType.CAUGHT: {
+        if (!activeHeistAsVictim) return;
+        soundFX.playCatchLock();
+        addLog(`Thief CAUGHT handshake verified! Recovering loot + winning bond!`, 'success');
+
+        const reward = activeHeistAsVictim.lootAmount + activeHeistAsVictim.bondAmount;
+        setVaultEth((prev) => prev + reward);
+        setImmunitySeconds(300); // 5 min immunity
+        setActiveHeistAsVictim(null);
+        break;
+      }
     }
   };
 
-  // Transmit ACK over sound
-  const handleTransmitAck = async (uid: number, status: number = 1) => {
-    try {
-      setIsTransmitting(true);
-      const ackBytes = packAck({
-        version: 1,
-        uid,
-        status,
-        txHash: '0x' + Array(64).fill('a').join(''),
-      });
-      addLog(`Playing 36-byte ACK (UID: 0x${uid.toString(16)}, Status: ${status})...`, 'info');
-      const res = await modem.transmit(ackBytes, selectedProtocol, volume);
-      addLog(`ACK transmitted (${Math.round(res.durationMs)} ms).`, 'success');
-    } catch (err: any) {
-      addLog(`ACK error: ${err.message}`, 'error');
-    } finally {
-      setIsTransmitting(false);
-    }
-  };
-
-  // Toggle Microphone Receiver
-  const toggleListening = async () => {
-    if (isListening) {
+  // Toggle Continuous Patrol Service
+  const togglePatrol = async () => {
+    if (isPatrolActive) {
       modem.stopListening();
-      setIsListening(false);
-      setMicLevel(0);
-      addLog('Microphone listener stopped.', 'info');
+      setIsPatrolActive(false);
+      addLog('Patrol deactivated. Microphone listening off.', 'info');
     } else {
       try {
-        await modem.startListening(
-          (bytes) => handleIncomingAudioPacket(bytes),
-          (level) => setMicLevel(level)
-        );
-        setIsListening(true);
-        addLog('Microphone active. Listening for payment or ACK chirps...', 'success');
+        await modem.startListening((bytes) => handleIncomingAudio(bytes));
+        setIsPatrolActive(true);
+        addLog('Patrol active. Listening for ultrasound pings (16.2 kHz)...', 'success');
       } catch (err: any) {
-        addLog(`Mic access failed: ${err.message}`, 'error');
+        addLog(`Microphone error: ${err.message}`, 'warn');
       }
     }
   };
 
-  // Handle incoming audio packet decoded by ggwave
-  const handleIncomingAudioPacket = (bytes: Uint8Array) => {
-    addLog(`Captured sound packet: ${bytes.length} bytes!`, 'info');
+  // Broadcast Room Scan
+  const handleScanRoom = async () => {
+    if (isScanning) return;
+    setIsScanning(true);
+    setSelectedTarget(null);
+    addLog('Emitting ultrasound PING (broadcast)...', 'info');
 
-    if (bytes.length === 132) {
-      const payment = unpackPayment(bytes);
-      if (payment) {
-        addLog(`Valid 132-byte SonicPay payment decoded! UID: 0x${payment.uid.toString(16)}`, 'success');
-        setReceivedPayments((prev) => [
-          {
-            timestamp: new Date().toLocaleTimeString(),
-            data: payment,
-            rawHex: bytesToHex(bytes),
-          },
-          ...prev,
-        ]);
-        return;
-      }
+    // Ensure audio context is started
+    if (!isPatrolActive) {
+      await togglePatrol();
     }
 
-    if (bytes.length === 36) {
-      const ack = unpackAck(bytes);
-      if (ack) {
-        addLog(`Valid 36-byte ACK received! Status: ${STATUS_NAMES[ack.status] || ack.status}`, 'success');
-        setReceivedAcks((prev) => [
-          { timestamp: new Date().toLocaleTimeString(), data: ack },
-          ...prev,
-        ]);
-        return;
-      }
+    const ping = encodePing({
+      scannerUid: burner.uid,
+      nonce: Math.floor(Math.random() * 0xffff),
+      targetUid: 0, // Everyone
+    });
+
+    try {
+      await modem.transmit(ping, audioProtocol, volume);
+      addLog('Ping sent. Listening for nearby player replies...', 'info');
+    } catch (err: any) {
+      addLog(`Scan transmit error: ${err.message}`, 'warn');
     }
 
-    addLog(`Received unknown packet of size ${bytes.length} bytes (hex: ${bytesToHex(bytes.slice(0, 16))}...)`, 'warn');
+    setTimeout(() => {
+      setIsScanning(false);
+      addLog(`Scan complete. ${nearbyPlayers.length} agents in range.`, 'info');
+    }, 5000);
   };
 
-  // Direct internal memory verification
-  const handleMemoryTest = () => {
-    const raw = packPayment(mockPayment);
-    const decoded = unpackPayment(raw);
-    if (decoded && decoded.uid === mockPayment.uid && decoded.amount === mockPayment.amount) {
-      addLog(`Pack/Unpack memory validation passed! Exact 132 bytes verified.`, 'success');
-    } else {
-      addLog(`Pack/Unpack failed!`, 'error');
+  // Initiate Heist against selected target
+  const handleInitiateHeist = async () => {
+    if (!selectedTarget) return;
+    if (cooldownSeconds > 0) {
+      addLog(`Cannot loot: cooldown active for ${cooldownSeconds}s.`, 'warn');
+      return;
     }
+    if (vaultEth < 0.05) {
+      addLog(`Vault stake too low to post bond! Deposit ETH first.`, 'warn');
+      return;
+    }
+
+    addLog(`Initiating ultrasound heist against "${selectedTarget.name}"...`, 'loot');
+    const req = encodeLootReq({
+      thiefAddress: burner.address,
+      victimUid: selectedTarget.uid,
+    });
+
+    await modem.transmit(req, audioProtocol, volume);
+    addLog(`LOOT_REQ transmitted. Awaiting consent ticket from target phone...`, 'info');
+  };
+
+  // Victim Cancel Action
+  const handleVictimCancel = async () => {
+    if (!activeHeistAsVictim) return;
+    setActiveHeistAsVictim((prev) => prev ? ({ ...prev, isCancelling: true }) : null);
+    addLog('Transmitting CATCH challenge to thief over ultrasound...', 'loot');
+
+    const catchMsg = encodeCatch({
+      lootId: activeHeistAsVictim.lootId,
+      challenge: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]),
+      signature: new Uint8Array(64).fill(0x33),
+    });
+
+    await modem.transmit(catchMsg, audioProtocol, volume);
+  };
+
+  // Thief Claim Action
+  const handleThiefClaim = () => {
+    if (!activeHeistAsThief) return;
+    const payout = activeHeistAsThief.lootAmount + activeHeistAsThief.bondAmount;
+    setVaultEth((prev) => prev + payout);
+    setCooldownSeconds(120); // 2 min thief cooldown
+    addLog(`CLAIMED! +${payout.toFixed(4)} ETH credited to your vault!`, 'success');
+    setActiveHeistAsThief(null);
+  };
+
+  // Quick Simulation Helper (For 1-device demonstration)
+  const handleQuickSimulate = () => {
+    addLog('Simulating incoming heist on this device...', 'alert');
+    const dummyLoot = 0.25;
+    const dummyBond = 0.05;
+    const now = Math.floor(Date.now() / 1000);
+
+    setActiveHeistAsVictim({
+      lootId: 404,
+      thiefName: 'Shadow Lynx 7A1F',
+      thiefUid: 0x7a1f,
+      lootAmount: dummyLoot,
+      bondAmount: dummyBond,
+      deadline: now + 60,
+      isThiefInRange: true,
+      thiefSignalLevel: 0.9,
+      isCancelling: false,
+    });
+    setVaultEth((prev) => Math.max(0, prev - dummyLoot));
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-8 border-b border-slate-800 gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-              <Radio className="w-6 h-6 animate-pulse" />
+    <div className="max-w-md mx-auto min-h-screen px-4 py-6 flex flex-col justify-between">
+      <div>
+        {/* Header Bar */}
+        <header className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <Skull className="w-4 h-4" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                SonicPay
-                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">
-                  Audio Modem Prototype
+              <h1 className="text-base font-black text-white tracking-wider flex items-center gap-1.5 font-mono">
+                SONIC HEIST
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  L2
                 </span>
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Offline Crypto Payments Over Sound (132-Byte Payload Verification)
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Connectivity Pill */}
-        <div className="flex items-center gap-3">
-          <div
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${
-              isOnline
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-            }`}
-          >
-            {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-            <span>{isOnline ? 'Online (Relayer Mode Ready)' : 'Offline / Airplane Mode'}</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Mode Navigation Tabs */}
-      <div className="flex rounded-xl bg-slate-900/80 p-1.5 border border-slate-800 mb-8">
-        <button
-          onClick={() => setActiveTab('transmitter')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'transmitter'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-          }`}
-        >
-          <Volume2 className="w-4 h-4" />
-          <span>Payer (Transmitter)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('receiver')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'receiver'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-          }`}
-        >
-          <Mic className="w-4 h-4" />
-          <span>Relayer (Receiver)</span>
-          {isListening && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveTab('loopback')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'loopback'
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>Verification & Diagnostics</span>
-        </button>
-      </div>
-
-      {/* TAB 1: TRANSMITTER (PAYER) */}
-      {activeTab === 'transmitter' && (
-        <div className="space-y-6">
-          {/* Card: Mock Payload Fields */}
-          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6 backdrop-blur">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-indigo-400" />
-                Offline Payment Payload Structure
-              </h2>
-              <span className="text-xs px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-300 font-mono">
-                Exact Size: 132 Bytes
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-500 block mb-1">Payer (from)</span>
-                <span className="text-slate-200 break-all">{mockPayment.from}</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-500 block mb-1">Receiver (Bob)</span>
-                <span className="text-slate-200 break-all">{mockPayment.receiver}</span>
-              </div>
-              {/* Editable Amount */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-slate-400 font-medium">Payment Amount (USDC)</label>
-                  <span className="text-[11px] text-emerald-400 font-semibold">
-                    {(Number(mockPayment.amount) / 1e6).toFixed(6)} USDC
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0.000001"
-                  value={usdcAmountInput}
-                  onChange={(e) => handleAmountChange(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
-                  placeholder="e.g. 5.0"
-                />
-                <div className="flex gap-1.5 mt-2">
-                  {['0.5', '1.0', '5.0', '25.0'].map((preset) => (
-                    <button
-                      key={preset}
-                      onClick={() => handleAmountChange(preset)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all ${
-                        usdcAmountInput === preset
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-                      }`}
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Editable Relayer Fee */}
-              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-slate-400 font-medium">Relayer Fee (USDC)</label>
-                  <span className="text-[11px] text-indigo-400 font-semibold">
-                    {(mockPayment.fee / 1e6).toFixed(6)} USDC
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  step="0.005"
-                  min="0"
-                  value={feeInput}
-                  onChange={(e) => handleFeeChange(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-indigo-400 font-mono font-bold focus:outline-none focus:border-indigo-500"
-                  placeholder="e.g. 0.01"
-                />
-                <div className="flex gap-1.5 mt-2">
-                  {['0.005', '0.01', '0.02', '0.05'].map((preset) => (
-                    <button
-                      key={preset}
-                      onClick={() => handleFeeChange(preset)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all ${
-                        feeInput === preset
-                          ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-                      }`}
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* UID with Randomizer */}
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
-                <div>
-                  <span className="text-slate-500 block mb-1">UID (16-bit match tag)</span>
-                  <span className="text-amber-300 font-bold text-sm">
-                    0x{mockPayment.uid.toString(16).toUpperCase()}
-                  </span>
-                </div>
-                <button
-                  onClick={handleRandomizeUid}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-[11px] flex items-center gap-1 font-sans transition-all"
-                >
-                  <RotateCcw className="w-3 h-3 text-amber-400" />
-                  <span>Randomize</span>
-                </button>
-              </div>
-
-              {/* Total Signed Value */}
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
-                <span className="text-slate-500 block mb-1">Total Authorization Value (Amount + Fee)</span>
-                <span className="text-slate-200 font-bold text-sm">
-                  {((Number(mockPayment.amount) + mockPayment.fee) / 1e6).toFixed(6)} USDC
-                </span>
-              </div>
-            </div>
-
-            {/* Raw Hex view */}
-            <div className="mt-4 pt-4 border-t border-slate-800/80">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-xs text-slate-400 font-mono">Raw Binary Hex (132 bytes)</span>
-                <span className="text-xs text-slate-500 font-mono">
-                  {packedPaymentBytes.length} / 140 max bytes
-                </span>
-              </div>
-              <p className="font-mono text-[11px] text-slate-400 bg-slate-950 p-2.5 rounded-lg border border-slate-800 break-all select-all">
-                {bytesToHex(packedPaymentBytes)}
-              </p>
+              <p className="text-[10px] font-mono text-slate-400">Ultrasound Real-World Thief Game</p>
             </div>
           </div>
 
-          {/* Audio Controls */}
-          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6">
-            <h3 className="text-sm font-semibold text-white mb-4">Transmission Settings</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="text-xs text-slate-400 mb-1.5 block">Acoustic Protocol</label>
-                <select
-                  value={selectedProtocol}
-                  onChange={(e) => setSelectedProtocol(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                >
-                  {protocols.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs text-slate-400 mb-1.5">
-                  <span>Speaker Volume</span>
-                  <span className="font-mono">{volume}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="5"
-                  max="50"
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
-                  className="w-full accent-indigo-500 cursor-pointer"
-                />
-              </div>
-            </div>
-
-            {/* Play Button */}
-            <button
-              onClick={handleTransmitPayment}
-              disabled={isTransmitting}
-              className={`w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-3 transition-all shadow-lg ${
-                isTransmitting
-                  ? 'bg-amber-600 text-white cursor-not-allowed animate-pulse'
-                  : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-indigo-600/25'
+          <div className="flex items-center gap-2">
+            <div
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${
+                isOnline
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
               }`}
             >
-              <Volume2 className={`w-5 h-5 ${isTransmitting ? 'animate-bounce' : ''}`} />
-              <span>
-                {isTransmitting
-                  ? 'Playing Audio Waveform... (Keep Near Receiver)'
-                  : 'Broadcast Payment Over Sound (132 Bytes)'}
-              </span>
-            </button>
-
-            {txDuration && !isTransmitting && (
-              <p className="text-xs text-emerald-400 text-center mt-3">
-                Last broadcast took {txDuration} ms to emit through speakers.
-              </p>
-            )}
+              {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              <span>{isOnline ? 'Base Sepolia' : 'No Signal'}</span>
+            </div>
           </div>
-        </div>
-      )}
+        </header>
 
-      {/* TAB 2: RECEIVER (RELAYER) */}
-      {activeTab === 'receiver' && (
-        <div className="space-y-6">
-          {/* Listening Control */}
-          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                  <Mic className="w-5 h-5 text-indigo-400" />
-                  Relayer Acoustic Listener
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Listens through microphone for 132-byte payments or 36-byte ACKs.
-                </p>
-              </div>
+        {/* Dynamic Overlays: Thief Running View or Victim Hunting View */}
+        {activeHeistAsVictim ? (
+          <div className="mb-6">
+            <VictimHuntView
+              lootId={activeHeistAsVictim.lootId}
+              thiefName={activeHeistAsVictim.thiefName}
+              thiefUid={activeHeistAsVictim.thiefUid}
+              lootAmount={activeHeistAsVictim.lootAmount}
+              bondAmount={activeHeistAsVictim.bondAmount}
+              deadline={activeHeistAsVictim.deadline}
+              isThiefInRange={activeHeistAsVictim.isThiefInRange}
+              thiefSignalLevel={activeHeistAsVictim.thiefSignalLevel}
+              isCancelling={activeHeistAsVictim.isCancelling}
+              onCancelHeist={handleVictimCancel}
+              onTimeoutLoss={() => {
+                addLog('HUNT WINDOW EXPIRED! Loot lost to thief.', 'alert');
+                setActiveHeistAsVictim(null);
+              }}
+            />
+          </div>
+        ) : activeHeistAsThief ? (
+          <div className="mb-6">
+            <ThiefRunView
+              lootId={activeHeistAsThief.lootId}
+              victimName={activeHeistAsThief.victimName}
+              lootAmount={activeHeistAsThief.lootAmount}
+              bondAmount={activeHeistAsThief.bondAmount}
+              startedAt={activeHeistAsThief.startedAt}
+              revealAt={activeHeistAsThief.revealAt}
+              deadline={activeHeistAsThief.deadline}
+              isCaught={activeHeistAsThief.isCaught}
+              onClaimLoot={handleThiefClaim}
+              onClose={() => setActiveHeistAsThief(null)}
+            />
+          </div>
+        ) : (
+          /* Normal Vault & Radar View */
+          <div className="space-y-5">
+            {/* Player Vault Card */}
+            <VaultCard
+              vaultEth={vaultEth}
+              walletEth={walletEth}
+              playerName={getPlayerName(burner.uid)}
+              playerAddress={burner.address}
+              playerUid={burner.uid}
+              isPatrolActive={isPatrolActive}
+              isShielded={isShielded}
+              immunitySeconds={immunitySeconds}
+              cooldownSeconds={cooldownSeconds}
+              onTogglePatrol={togglePatrol}
+              onToggleShield={() => {
+                setIsShielded(!isShielded);
+                addLog(`Shield mode ${!isShielded ? 'ENABLED' : 'DISABLED'}.`, 'info');
+              }}
+              onDeposit={(amt) => setVaultEth((v) => v + amt)}
+              onWithdraw={(amt) => setVaultEth((v) => Math.max(0, v - amt))}
+            />
 
+            {/* Radar Sweep Display */}
+            <div className="py-2">
+              <RadarSweep
+                isScanning={isScanning}
+                players={nearbyPlayers}
+                selectedUid={selectedTarget?.uid}
+                onSelectPlayer={(p) => {
+                  setSelectedTarget(p);
+                  addLog(`Locked target: ${p.name}`, 'info');
+                }}
+              />
+            </div>
+
+            {/* Radar Actions: Scan Room & Target Selection */}
+            <div className="space-y-3">
               <button
-                onClick={toggleListening}
-                className={`px-5 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all ${
-                  isListening
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30'
-                    : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-600/20'
+                onClick={handleScanRoom}
+                disabled={isScanning}
+                className={`w-full py-3.5 rounded-xl font-mono text-xs font-black tracking-wider flex items-center justify-center gap-2 transition-all ${
+                  isScanning
+                    ? 'bg-emerald-600/50 text-emerald-200 cursor-wait animate-pulse'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25'
                 }`}
               >
-                {isListening ? (
-                  <>
-                    <MicOff className="w-4 h-4" />
-                    <span>Stop Listening</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-4 h-4" />
-                    <span>Start Listening</span>
-                  </>
-                )}
+                <Radio className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
+                <span>{isScanning ? 'PULSING ULTRASOUND SCAN (16.2 kHz)...' : 'SCAN ROOM FOR TARGETS'}</span>
               </button>
-            </div>
 
-            {/* Mic VU meter */}
-            {isListening && (
-              <div className="mt-5 pt-4 border-t border-slate-800">
-                <div className="flex justify-between items-center text-xs text-slate-400 mb-1.5 font-mono">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                    Microphone Active (Continuous Ingestion)
-                  </span>
-                  <span>Audio Level</span>
-                </div>
-                <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-                  <div
-                    className="bg-gradient-to-r from-emerald-500 to-indigo-500 h-full transition-all duration-75"
-                    style={{ width: `${Math.min(100, micLevel * 100)}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Captured Payments Feed */}
-          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6">
-            <h3 className="text-sm font-semibold text-white mb-4 flex items-center justify-between">
-              <span>Captured Offline Payments</span>
-              <span className="text-xs font-mono font-normal text-slate-400">
-                {receivedPayments.length} Detected
-              </span>
-            </h3>
-
-            {receivedPayments.length === 0 ? (
-              <div className="text-center py-10 border border-dashed border-slate-800 rounded-xl">
-                <Volume2 className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-400">No sound packets decoded yet.</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Start listening and emit a payment from the Payer tab or another device.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {receivedPayments.map((p, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs font-bold text-emerald-300">
-                          DECODED 132-BYTE PAYMENT
-                        </span>
-                      </div>
-                      <span className="text-[11px] font-mono text-slate-500">{p.timestamp}</span>
+              {/* Selected Target Action Card */}
+              {selectedTarget && (
+                <div className="p-4 rounded-xl bg-slate-900 border border-amber-500/40 space-y-3 animate-in fade-in">
+                  <div className="flex justify-between items-center text-xs font-mono">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">LOCKED VICTIM:</span>
+                      <span className="text-amber-300 font-bold text-sm">{selectedTarget.name}</span>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                      <div>
-                        <span className="text-slate-500">From: </span>
-                        <span className="text-slate-300">{p.data.from.slice(0, 10)}...</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Receiver: </span>
-                        <span className="text-slate-300">{p.data.receiver.slice(0, 10)}...</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Amount: </span>
-                        <span className="text-emerald-400">
-                          {(Number(p.data.amount) / 1e6).toFixed(6)} USDC
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Relay Fee: </span>
-                        <span className="text-indigo-400">
-                          {(p.data.fee / 1e6).toFixed(6)} USDC
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">UID Tag: </span>
-                        <span className="text-amber-300">0x{p.data.uid.toString(16)}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Expires: </span>
-                        <span className="text-slate-300">
-                          {new Date(p.data.validBefore * 1000).toLocaleTimeString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Simulate sending ACK */}
-                    <div className="pt-2 border-t border-slate-900 flex justify-end">
-                      <button
-                        onClick={() => handleTransmitAck(p.data.uid, 1)}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 text-xs font-medium flex items-center gap-1.5 transition-all"
-                      >
-                        <Send className="w-3 h-3" />
-                        <span>Send Audio ACK (Status 1)</span>
-                      </button>
-                    </div>
+                    <span className="text-emerald-400 font-bold">~1.2m away</span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* TAB 3: VERIFICATION & DIAGNOSTICS */}
-      {activeTab === 'loopback' && (
-        <div className="space-y-6">
-          <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-6">
-            <h2 className="text-base font-semibold text-white mb-2">
-              End-to-End Verification Instructions
-            </h2>
-            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-              This prototype tests the acoustic transport layer required by SonicPay before the full
-              on-chain smart contract integration.
-            </p>
-
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-start gap-3">
-                <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 mt-0.5">
-                  <CheckCircle2 className="w-4 h-4" />
+                  <button
+                    onClick={handleInitiateHeist}
+                    className="w-full py-3 rounded-lg bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white font-mono text-xs font-black tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-amber-600/30"
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>STEAL FROM VAULT (5%-25%)</span>
+                  </button>
                 </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-white">1. Single-Machine Loopback Test</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Open two browser windows (or tabs) side-by-side. On Tab 1, switch to "Relayer" and click
-                    "Start Listening". On Tab 2, switch to "Payer" and click "Broadcast Payment Over Sound".
-                    Within 5–8 seconds, Tab 1 will decode the exact 132 bytes and show green confirmation!
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-start gap-3">
-                <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 mt-0.5">
-                  <WifiOff className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-white">2. Two-Device Airplane Mode Test</h4>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Load this PWA on your phone. Put your phone in <strong>Airplane Mode</strong> (Wi-Fi and
-                    cellular off). Keep the laptop online on the Relayer tab. Play the sound from the offline phone.
-                    The online laptop will capture and decode the payload over the air!
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-800 flex gap-3">
-              <button
-                onClick={handleMemoryTest}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-2 transition-all"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Run In-Memory Binary Roundtrip Test</span>
-              </button>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Live Event Log Console */}
-      <div className="mt-8 rounded-2xl bg-slate-900/60 border border-slate-800 p-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-slate-300 font-mono flex items-center gap-2">
-            <span>Diagnostic Activity Log</span>
-          </h3>
-          <button
-            onClick={() => setLogs([])}
-            className="text-[11px] text-slate-500 hover:text-slate-300 font-mono"
+        {/* Acoustic Protocol Selector */}
+        <div className="mt-5 p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center justify-between text-xs font-mono">
+          <span className="text-slate-400 flex items-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+            Frequency Band:
+          </span>
+          <select
+            value={audioProtocol}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              setAudioProtocol(val);
+              addLog(`Switched protocol to ID ${val}`, 'info');
+            }}
+            className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[11px] text-emerald-300 focus:outline-none"
           >
-            Clear
-          </button>
+            <option value={4}>Ultrasound Fast (16.2 kHz, Inaudible)</option>
+            <option value={5}>Ultrasound Fastest (17.5 kHz)</option>
+            <option value={1}>Audible Fast (3.6 kHz, Debug)</option>
+          </select>
         </div>
-        <div className="bg-slate-950 rounded-xl p-3 border border-slate-800 font-mono text-[11px] h-44 overflow-y-auto space-y-1.5">
-          {logs.length === 0 ? (
-            <span className="text-slate-600">No events logged yet.</span>
-          ) : (
-            logs.map((log, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className="text-slate-600 select-none">[{log.time}]</span>
-                <span
-                  className={
-                    log.type === 'success'
-                      ? 'text-emerald-400'
-                      : log.type === 'error'
-                      ? 'text-rose-400'
-                      : log.type === 'warn'
-                      ? 'text-amber-400'
-                      : 'text-slate-400'
-                  }
-                >
-                  {log.msg}
-                </span>
-              </div>
-            ))
-          )}
+
+        {/* Surveillance Feed */}
+        <div className="mt-4">
+          <ActivityLog logs={logs} onClear={() => setLogs([])} />
         </div>
       </div>
+
+      {/* Footer / Demo Simulator Controls */}
+      <footer className="mt-6 pt-4 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-500">
+        <span>Sonic Heist v1.0</span>
+        <button
+          onClick={handleQuickSimulate}
+          className="text-amber-400/80 hover:text-amber-300 underline"
+        >
+          [Simulate Alert on Me]
+        </button>
+      </footer>
     </div>
   );
 }
