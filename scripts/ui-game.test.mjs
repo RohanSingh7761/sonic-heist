@@ -62,7 +62,52 @@ assert.equal(reduce(staked(), { type: 'withdraw', amount: 0.1 }).stake, 0.25);
 }
 
 const rival = MOCK_PLAYERS[0];
-const robbed = (s = staked(), now = 0) => reduce(s, { type: 'incoming', now, rival, lootRate: 0.2 });
+const incoming = (s = staked(), now = 0) => reduce(s, { type: 'incoming', now, rival, lootRate: 0.2 });
+// Past the reveal: the moment the victim learns it was them.
+const robbed = (s = staked(), now = 0) => reduce(incoming(s, now), { type: 'tick', now: now + HEAD_START });
+const DEADLINE = HEAD_START + HUNT_WINDOW;
+
+// Victim until the reveal: looks exactly like a bystander, nothing shows who was robbed
+{
+  let s = incoming();
+  assert.equal(s.heist.phase, 'alarm');
+  assert.equal(s.stake, 0.25, 'stake must not drop before the reveal');
+  assert.equal(s.log.length, 1, 'no robbery in the log before the reveal');
+  assert.equal(s.heist.deadline, reduce(staked(), { type: 'alarm', now: 0 }).alarm.ends, 'same countdown as a bystander');
+  s = reduce(s, { type: 'tick', now: HEAD_START - 1 });
+  assert.equal(s.heist.phase, 'alarm');
+  s = reduce(s, { type: 'tick', now: HEAD_START });
+  assert.equal(s.heist.phase, 'alert');
+  near(s.stake, 0.2);
+  assert.equal(s.heist.deadline, DEADLINE);
+  // Skipping the wait still leaves a full hunt window
+  const skipped = reduce(incoming(), { type: 'skip', now: 3000 });
+  assert.equal(skipped.heist.phase, 'alert');
+  assert.equal(skipped.heist.deadline, 3000 + HUNT_WINDOW);
+}
+
+// Bystander: runs until the deadline with no money moved, then all clear without naming anyone
+{
+  let s = reduce(staked(), { type: 'alarm', now: 0 });
+  assert.equal(s.alarm.ends, DEADLINE);
+  assert.equal(reduce(s, { type: 'tick', now: DEADLINE - 1 }).alarm.ends, DEADLINE);
+  // Can't rob or be robbed while the alarm is on
+  assert.equal(incoming(s, 100).heist, null);
+  assert.equal(rob(scanned(s), 100).heist, null);
+  s = reduce(s, { type: 'tick', now: DEADLINE });
+  assert.equal(s.alarm, null);
+  assert.equal(s.stake, 0.25);
+  assert.equal(s.notice, 'All clear. The thief got away.');
+  assert.equal(s.noticeGood, true);
+  assert.equal(reduce(s, { type: 'clearNotice' }).noticeGood, false);
+  // Thief caught early: everyone can stop
+  const caught = run(staked(), { type: 'alarm', now: 0 }, { type: 'allClear', now: 5000, caught: true });
+  assert.equal(caught.alarm, null);
+  assert.equal(caught.notice, 'All clear. The thief was caught.');
+  assert.equal(run(staked(), { type: 'alarm', now: 0 }, { type: 'skip', now: 5000 }).alarm, null);
+  // A thief or victim keeps their own screen
+  assert.equal(reduce(robbed(), { type: 'alarm', now: 0 }).alarm, null);
+}
 
 // Victim saved: gets loot and bond back, immunity starts, cancel needs range
 {
@@ -88,24 +133,24 @@ const robbed = (s = staked(), now = 0) => reduce(s, { type: 'incoming', now, riv
 
 // Victim out of time: stake stays gone
 {
-  let s = reduce(robbed(), { type: 'tick', now: HUNT_WINDOW });
+  let s = reduce(robbed(), { type: 'tick', now: DEADLINE });
   assert.equal(s.heist.phase, 'lost');
   near(s.stake, 0.2);
   assert.equal(s.saves, 0);
-  assert.equal(s.immuneUntil, HUNT_WINDOW + IMMUNITY);
+  assert.equal(s.immuneUntil, DEADLINE + IMMUNITY);
 }
 
 // A handshake that outlasts the deadline must lose, not save (the contract enforces the deadline)
 {
-  let s = run(robbed(), { type: 'hunt' }, { type: 'pulse' }, { type: 'pulse' }, { type: 'pulse' }, { type: 'cancel', now: HUNT_WINDOW - 1000 });
-  s = reduce(s, { type: 'tick', now: HUNT_WINDOW + HANDSHAKE_TIME });
+  let s = run(robbed(), { type: 'hunt' }, { type: 'pulse' }, { type: 'pulse' }, { type: 'pulse' }, { type: 'cancel', now: DEADLINE - 1000 });
+  s = reduce(s, { type: 'tick', now: DEADLINE + HANDSHAKE_TIME });
   assert.equal(s.heist.phase, 'lost');
   near(s.stake, 0.2);
 }
 
 // Shield and patrol block robbery
-assert.equal(robbed(reduce(staked(), { type: 'toggle', key: 'shield' })).heist, null);
-assert.equal(robbed(reduce(staked(), { type: 'toggle', key: 'patrol' })).heist, null);
+assert.equal(incoming(reduce(staked(), { type: 'toggle', key: 'shield' })).heist, null);
+assert.equal(incoming(reduce(staked(), { type: 'toggle', key: 'patrol' })).heist, null);
 
 // Level-up fires exactly when a threshold is crossed
 {

@@ -6,9 +6,14 @@
     <meta name="theme-color" content="#2b2036" />
     <meta name="description" content="Sonic Heist: a real-world thief game played over sound" />
     <title>Sonic Heist</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Jersey+15&display=swap" rel="stylesheet" />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/jersey15-latin.woff2" crossorigin />
+    <!-- Title screen art, fetched before the app's code runs so it appears with the first paint. -->
+    <link rel="preload" as="image" href="/sprites/logo.svg" />
+    <link rel="preload" as="image" href="/sprites/scenes/wall-tile.svg" />
+    <link rel="preload" as="image" href="/sprites/scenes/floor-tile.svg" />
+    <link rel="preload" as="image" href="/sprites/rocco/lv2/thief-run.svg" />
+    <link rel="preload" as="image" href="/sprites/juno/lv1/run.svg" />
+    <link rel="preload" as="image" href="/sprites/nib/lv2/run.svg" />
   </head>
   <body>
     <div id="root"></div>

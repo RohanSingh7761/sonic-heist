@@ -103,11 +103,11 @@ export function RoundStart({ s, send }: Props) {
   useLoop(s.soundOn ? 'footsteps-loop' : null, 0.4);
   const cast = MOCK_PLAYERS.slice(0, 4);
   const runners: Runner[] = [
-    { avatar: s.avatar, level: 1, state: 'run', x: 70, y: 56, label: 'You' },
-    { avatar: cast[0].avatar, level: cast[0].level, state: 'run', x: 26, y: 44 },
-    { avatar: cast[1].avatar, level: cast[1].level, state: 'run', x: -14, y: 62 },
-    { avatar: cast[2].avatar, level: cast[2].level, state: 'run', x: -58, y: 46 },
-    { avatar: cast[3].avatar, level: cast[3].level, state: 'run', x: -92, y: 62 },
+    { avatar: s.avatar, level: 1, state: 'run', x: 64, y: 56, label: 'You' },
+    { avatar: cast[0].avatar, level: cast[0].level, state: 'run', x: 30, y: 44 },
+    { avatar: cast[1].avatar, level: cast[1].level, state: 'run', x: -4, y: 62 },
+    { avatar: cast[2].avatar, level: cast[2].level, state: 'run', x: -36, y: 46 },
+    { avatar: cast[3].avatar, level: cast[3].level, state: 'run', x: -64, y: 62 },
   ];
   return (
     <main className="screen center mood-night" style={{ padding: 0 }}>

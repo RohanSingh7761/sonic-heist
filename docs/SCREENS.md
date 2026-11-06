@@ -61,6 +61,7 @@ These thresholds are placeholders in `game.ts`.
 | `heist.hunted` | Hunted | Thief | `screens/Heist.tsx: Running` | Red |
 | `heist.won` | You got away | Thief | `screens/Heist.tsx: Won` | Gold |
 | `heist.caught` | Busted | Thief | `screens/Heist.tsx: Caught` | Dark |
+| `heist.alarm` | A stake was stolen | Everyone | `screens/Heist.tsx: Alarm` | Red |
 | `heist.alert` | You were robbed | Victim | `screens/Heist.tsx: Alert` | Flashing red |
 | `heist.hunting` | Hunt | Victim | `screens/Heist.tsx: Hunt` | Night |
 | `heist.handshake` | Catching them | Victim | `screens/Heist.tsx: Hunt` | Night |
@@ -268,7 +269,7 @@ These thresholds are placeholders in `game.ts`.
 | Player actions | None |
 | Avatar sprites | `avatar.{me}.lv{level}.thief-run` |
 | Other art | `scene.wall-tile`, `scene.floor-tile` |
-| Sounds | `sfx.dash`, `sfx.run-loop`, `sfx.footsteps-loop` |
+| Sounds | `sfx.alert`, `sfx.dash`, `sfx.run-loop`, `sfx.footsteps-loop` |
 | Needs for real | `revealAt` from `LootStarted`; answer CATCH with CAUGHT |
 
 ### heist.hunted: Hunted
@@ -283,7 +284,7 @@ These thresholds are placeholders in `game.ts`.
 | Player actions | None |
 | Avatar sprites | `avatar.{me}.lv{level}.thief-run`, `avatar.{rival}.lv{rival level}.hunt` |
 | Other art | `scene.wall-tile`, `scene.floor-tile` |
-| Sounds | `sfx.bang`, `sfx.run-loop`, `sfx.footsteps-loop`, `sfx.tick-urgent` |
+| Sounds | `sfx.run-loop`, `sfx.footsteps-loop`, `sfx.tick-urgent` |
 | Needs for real | `deadline` from `LootStarted`; answer CATCH with CAUGHT; `LootCancelled` event |
 
 ### heist.won: You got away
@@ -316,6 +317,23 @@ These thresholds are placeholders in `game.ts`.
 | Sounds | `sfx.bang`, `sfx.caught`, `sfx.coin-drop` |
 | Needs for real | `LootCancelled` event |
 
+## Everyone
+
+### heist.alarm: A stake was stolen
+
+| Field | Value |
+| --- | --- |
+| Screen ID | `heist.alarm` |
+| Component | `screens/Heist.tsx: Alarm` |
+| Mood | Red |
+| Shown when | Any loot starts: bystanders (`data-view="alarm"`, until the deadline or an early all clear) and the victim (`heist-alarm`, for the 10 s head start). The thief is on heist.headstart at the same moment |
+| Leads to | Bystander: previous screen with an all clear notice (70 s, or when the thief is caught). Victim: heist.alert (10 s) |
+| Player actions | None |
+| Avatar sprites | `avatar.{me}.lv{level}.run`, `avatar.{player}.lv{player level}.run` |
+| Other art | `scene.wall-tile`, `scene.floor-tile` |
+| Sounds | `sfx.alert`, `sfx.run-loop`, `sfx.footsteps-loop`, `sfx.tick-urgent` |
+| Needs for real | Every phone watches `LootStarted` and ends on `LootCancelled` or the deadline. The victim's phone must not reveal itself before `revealAt` |
+
 ## Victim
 
 ### heist.alert: You were robbed
@@ -325,7 +343,7 @@ These thresholds are placeholders in `game.ts`.
 | Screen ID | `heist.alert` |
 | Component | `screens/Heist.tsx: Alert` |
 | Mood | Flashing red |
-| Shown when | Head start ended on a loot against this player |
+| Shown when | Reveal: the alarm's first 10 s ended and this player was the victim |
 | Leads to | heist.hunting (tap, or 4 s) |
 | Player actions | Start the hunt |
 | Avatar sprites | `avatar.{me}.lv{level}.alert` |
@@ -417,13 +435,13 @@ These thresholds are placeholders in `game.ts`.
 | Screen ID | `overlay.notice` |
 | Component | `UiApp.tsx: UiApp` |
 | Mood | Ink |
-| Shown when | An action is refused |
+| Shown when | An action is refused, or the stolen stake alarm ends |
 | Leads to | Clears after 3.2 s |
 | Player actions | None |
 | Avatar sprites | None |
 | Other art | None |
-| Sounds | `sfx.ui-deny` |
-| Needs for real | Contract revert messages |
+| Sounds | `sfx.ui-deny`, `sfx.shield-on` |
+| Needs for real | Contract revert messages; `LootCancelled` or the deadline for the all clear |
 
 ### overlay.demo: Demo controls
 
@@ -434,7 +452,7 @@ These thresholds are placeholders in `game.ts`.
 | Mood | Cream |
 | Shown when | DEMO tab pressed |
 | Leads to | Any heist state |
-| Player actions | Someone robs me, victim finds me, skip timer, +1 win, restart |
+| Player actions | Someone robs me, someone else robbed, thief caught, victim finds me, skip timer, +1 win, restart |
 | Avatar sprites | None |
 | Other art | None |
 | Sounds | None |

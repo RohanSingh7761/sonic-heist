@@ -1,10 +1,10 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
-import { MOCK_PLAYERS, initialState, levelFor, reduce, type Action, type GameState, type View } from './game';
-import { AVATARS, Btn, Icon, LEVEL_TITLES, Sprite, setSoundOn, sfx, useNow } from './kit';
+import { MOCK_PLAYERS, initialState, levelFor, reduce, type Action, type AvatarId, type GameState, type Level, type View } from './game';
+import { AVATARS, Btn, Icon, LEVEL_TITLES, Sprite, setSoundOn, sfx, spriteUrl, useNow, type SpriteState } from './kit';
 import { soundFX } from '../game/soundFX';
 import { Pick, RoundStart, Setup, Title } from './screens/Intro';
 import { Levels, Log, Scan, Settings, TableHome } from './screens/Home';
-import { HeistScreen } from './screens/Heist';
+import { Alarm, HeistScreen } from './screens/Heist';
 
 const PLAYER_NAME = 'Sly Fox 3F2A'; // mock: comes from the wallet's uid once integrated
 const TABS: { view: View; label: string; icon: 'table' | 'star' | 'scroll' | 'gear' }[] = [
@@ -13,6 +13,38 @@ const TABS: { view: View; label: string; icon: 'table' | 'star' | 'scroll' | 'ge
   { view: 'log', label: 'Activity', icon: 'scroll' },
   { view: 'settings', label: 'Settings', icon: 'gear' },
 ];
+
+// Kept referenced so the browser holds them ready: a screen then shows its art on its first frame.
+const warmed = new Map<string, HTMLImageElement>();
+function warm(urls: string[]) {
+  return Promise.all(urls.filter((u) => !warmed.has(u)).map((u) => {
+    const img = new Image();
+    img.src = u;
+    warmed.set(u, img);
+    return img.decode().catch(() => { warmed.delete(u); }); // the screen's own <img> still tries, and the next warm retries
+  }));
+}
+
+const AVATAR_IDS = Object.keys(AVATARS) as AvatarId[];
+const ALL_STATES: SpriteState[] = ['idle', 'seated', 'sneak', 'thief', 'run', 'thief-run', 'swag', 'cry', 'caught', 'saved', 'alert', 'hunt', 'locked'];
+const STAGE_ART = ['scenes/room', 'scenes/table', 'scenes/radar', 'props/chair', 'props/stack-1', 'props/stack-2', 'props/stack-3', 'props/stack-4'].map((p) => `/sprites/${p}.svg`);
+
+// In the order the player reaches them, so slow connections fetch the next screen's art first.
+async function warmGameArt(avatar: AvatarId, level: Level) {
+  await warm(AVATAR_IDS.map((id) => spriteUrl(id, 1, 'idle')));
+  await warm(AVATAR_IDS.flatMap((id) => [
+    ...(['thief', 'swag', 'cry', 'saved', 'run'] as const).map((st) => spriteUrl(id, 1, st)),
+    spriteUrl(id, 2, 'idle'),
+    spriteUrl(id, 3, 'idle'),
+  ]));
+  await warm(STAGE_ART);
+  await warm([
+    ...ALL_STATES.map((st) => spriteUrl(avatar, level, st)),
+    ...([1, 2, 3] as const).map((l) => spriteUrl(avatar, l, 'locked')),
+    ...(level < 3 ? (['saved', 'seated'] as const).map((st) => spriteUrl(avatar, (level + 1) as Level, st)) : []),
+    ...MOCK_PLAYERS.flatMap((p) => (['seated', 'idle', 'run', 'hunt'] as const).map((st) => spriteUrl(p.avatar, p.level, st))),
+  ]);
+}
 
 function LevelUp({ s, send }: { s: GameState; send: (a: Action) => void }) {
   const to = s.levelUpTo;
@@ -43,6 +75,8 @@ function DemoControls({ s, send, now }: { s: GameState; send: (a: Action) => voi
           <div className="spread"><b>Demo controls</b><span className="small-text muted">Not part of the game</span></div>
           <div className="demo-grid">
             <Btn small onClick={() => act({ type: 'incoming', now, rival: MOCK_PLAYERS[Math.floor(Math.random() * 4)], lootRate: 0.05 + Math.random() * 0.2 })}>Someone robs me</Btn>
+            <Btn small disabled={!!s.heist || !!s.alarm} onClick={() => act({ type: 'alarm', now })}>Someone else robbed</Btn>
+            <Btn small disabled={!s.alarm} onClick={() => act({ type: 'allClear', now, caught: true })}>Thief caught</Btn>
             <Btn small disabled={!canCatch} onClick={() => act({ type: 'victimFoundMe', now })}>Victim finds me</Btn>
             <Btn small onClick={() => act({ type: 'skip', now })}>Skip timer</Btn>
             <Btn small onClick={() => act({ type: 'addWin' })}>+1 win</Btn>
@@ -61,16 +95,18 @@ export function UiApp() {
   useEffect(() => { send({ type: 'tick', now }); }, [now]);
   useEffect(() => { setSoundOn(s.soundOn); }, [s.soundOn]);
 
-  // Load sounds on the first tap: browsers won't start audio before one.
+  // Art first, then sounds, so sounds never hold up a screen's sprites. Waits for the
+  // next paint because decoding on the main thread would otherwise delay this screen.
+  const level = levelFor(s.thefts + s.saves);
   useEffect(() => {
-    const first = () => soundFX.preload();
-    window.addEventListener('pointerdown', first, { once: true });
-    return () => window.removeEventListener('pointerdown', first);
-  }, []);
+    const id = requestAnimationFrame(() => setTimeout(() => warmGameArt(s.avatar, level).then(() => soundFX.preload())));
+    return () => cancelAnimationFrame(id);
+  }, [s.avatar, level]);
 
   useEffect(() => {
     if (!s.notice) return;
-    sfx('ui-deny');
+    if (s.noticeGood) sfx('shield-on');
+    else sfx('ui-deny');
     const id = setTimeout(() => send({ type: 'clearNotice' }), 3200);
     return () => clearTimeout(id);
   }, [s.notice]);
@@ -85,24 +121,26 @@ export function UiApp() {
     if (h.phase !== was?.phase) {
       if (h.phase === 'grab') sfx('loot-grab');
       if (h.phase === 'disguise') sfx('bling');
-      if (h.phase === 'headstart') sfx('dash');
-      if (h.phase === 'hunted') sfx('bang');
+      // The thief hears the same alarm as everyone. No sound at the reveal: it would point right at them.
+      if (h.phase === 'headstart') { sfx('alert'); sfx('dash'); if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]); }
+      if (h.phase === 'hunted' && 'vibrate' in navigator) navigator.vibrate(300);
     }
     if (h.inRange && !was?.inRange) sfx('thief-near');
   }, [s.heist]);
 
   // Countdown ticks for the last 10 seconds of a hunt.
-  const remaining = s.heist?.deadline != null ? Math.ceil((s.heist.deadline - now) / 1000) : null;
+  const ends = s.alarm?.ends ?? s.heist?.deadline;
+  const remaining = ends != null ? Math.ceil((ends - now) / 1000) : null;
   useEffect(() => {
     const phase = s.heist?.phase;
-    if (remaining !== null && remaining > 0 && remaining <= 10 && (phase === 'hunting' || phase === 'hunted' || phase === 'handshake')) sfx('tick-urgent', 0.5);
+    if (remaining !== null && remaining > 0 && remaining <= 10 && (s.alarm || phase === 'hunting' || phase === 'hunted' || phase === 'handshake')) sfx('tick-urgent', 0.5);
   }, [remaining]);
 
   const p = { s, send, now };
-  const onTab = !s.heist && TABS.some((t) => t.view === s.view);
+  const onTab = !s.heist && !s.alarm && TABS.some((t) => t.view === s.view);
   return (
-    <div className="phone" data-view={s.heist ? `heist-${s.heist.phase}` : s.view}>
-      {s.heist ? <HeistScreen {...p} h={s.heist} /> : (
+    <div className="phone" data-view={s.alarm ? 'alarm' : s.heist ? `heist-${s.heist.phase}` : s.view}>
+      {s.alarm ? <Alarm s={s} ends={s.alarm.ends} now={now} /> : s.heist ? <HeistScreen {...p} h={s.heist} /> : (
         <>
           {s.view === 'title' && <Title {...p} />}
           {s.view === 'pick' && <Pick {...p} />}

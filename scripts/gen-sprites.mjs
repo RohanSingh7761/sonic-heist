@@ -38,32 +38,62 @@ class Canvas {
   dot(x, y, c) {
     if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.px[y][x] = c;
   }
-  // Row-run paths grouped by colour: far smaller than one <rect> per pixel.
+  // Every filled pixel, in row order: "x y" -> colour.
+  colours(pal) {
+    const out = new Map();
+    this.px.forEach((row, y) => row.forEach((c, x) => {
+      if (!c) return;
+      if (!pal[c]) throw new Error(`No colour for key "${c}"`);
+      out.set(`${x} ${y}`, pal[c]);
+    }));
+    return out;
+  }
   svg(pal) {
-    const byColour = {};
-    this.px.forEach((row, y) => {
-      for (let x = 0; x < row.length; ) {
-        const c = row[x];
-        if (!c) {
-          x++;
-          continue;
-        }
-        let e = x + 1;
-        while (e < row.length && row[e] === c) e++;
-        const col = pal[c];
-        if (!col) throw new Error(`No colour for key "${c}"`);
-        (byColour[col] ??= []).push(`M${x} ${y}h${e - x}v1h-${e - x}z`);
-        x = e;
-      }
-    });
-    return Object.entries(byColour)
-      .map(([col, d]) => `<path fill="${col}" d="${d.join('')}"/>`)
-      .join('');
+    return rectPaths(this.colours(pal));
   }
 }
 
-// Flipbook: [{ body, ms }]. Stepped CSS so it stays pixel-crisp, works in <img> and when inlined.
+// One path per colour, with same-coloured pixels merged into rectangles and each move relative to the last.
+function rectPaths(pixels) {
+  const byColour = new Map();
+  for (const [key, col] of pixels) {
+    if (!byColour.has(col)) byColour.set(col, new Set());
+    byColour.get(col).add(key);
+  }
+  let out = '';
+  for (const [col, left] of byColour) {
+    let d = '';
+    let px = 0;
+    let py = 0;
+    for (const key of [...left]) {
+      if (!left.has(key)) continue;
+      const [x, y] = key.split(' ').map(Number);
+      let w = 1;
+      while (left.has(`${x + w} ${y}`)) w++;
+      let h = 1;
+      const rowFree = (r) => Array.from({ length: w }, (_, i) => `${x + i} ${r}`).every((k) => left.has(k));
+      while (rowFree(y + h)) h++;
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) left.delete(`${x + i} ${y + j}`);
+      const dx = x - px;
+      const dy = y - py;
+      d += `${d ? 'm' : 'M'}${dx}${dy < 0 ? '' : ' '}${dy}h${w}v${h}h-${w}z`;
+      px = x;
+      py = y;
+    }
+    out += `<path fill="${col}" d="${d}"/>`;
+  }
+  return out;
+}
+
+// Flipbook: [{ body, ms }] or [{ px, ms }]. Stepped CSS so it stays pixel-crisp, works in <img> and when inlined.
 function flipbook(id, w, h, frames, extraDefs = '') {
+  // Pixels that never change are drawn once underneath; each frame then holds only what differs.
+  let still = '';
+  if (frames[0].px) {
+    const shared = new Map([...frames[0].px].filter(([k, c]) => frames.every((f) => f.px.get(k) === c)));
+    still = rectPaths(shared);
+    frames = frames.map((f) => ({ ms: f.ms, body: rectPaths(new Map([...f.px].filter(([k]) => !shared.has(k)))) }));
+  }
   const total = frames.reduce((a, f) => a + f.ms, 0);
   const unique = [...new Set(frames.map((f) => f.body))];
   const fracs = [...new Set(frames.map((f) => f.ms))];
@@ -80,7 +110,7 @@ function flipbook(id, w, h, frames, extraDefs = '') {
     .join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w * 4}" height="${h * 4}" shape-rendering="crispEdges"><style>.${id}-p{visibility:hidden;animation-duration:${total}ms;animation-iteration-count:infinite;animation-timing-function:steps(1,end)}${kf}@media(prefers-reduced-motion:reduce){.${id}-p{animation:none}.${id}-first{visibility:visible}}</style><defs>${extraDefs}${unique
     .map((b, i) => `<g id="${id}-${i}">${b}</g>`)
-    .join('')}</defs>${seq}</svg>`;
+    .join('')}</defs>${still}${seq}</svg>`;
 }
 
 // ---------- shared colours ----------
@@ -843,11 +873,11 @@ for (const [name, av] of Object.entries(AVATARS)) {
   av.levels.forEach((lvl, li) => {
     const pal = palFor(lvl);
     for (const [state, make] of Object.entries(STATES)) {
-      const frames = make(av, lvl).map(([o, ms], tick) => ({ body: pose(av, lvl, o, tick).svg(pal), ms }));
+      const frames = make(av, lvl).map(([o, ms], tick) => ({ px: pose(av, lvl, o, tick).colours(pal), ms }));
       write(`${name}/lv${li + 1}/${state}.svg`, flipbook(`${name}${li + 1}${state.replace('-', '')}`, S, S, frames));
     }
     const lockedLvl = { ...lvl, shine: false };
-    write(`${name}/lv${li + 1}/locked.svg`, flipbook(`${name}${li + 1}locked`, S, S, [{ body: pose(av, lockedLvl).svg(fade(pal)), ms: 1000 }]));
+    write(`${name}/lv${li + 1}/locked.svg`, flipbook(`${name}${li + 1}locked`, S, S, [{ px: pose(av, lockedLvl).colours(fade(pal)), ms: 1000 }]));
   });
 }
 
@@ -1131,7 +1161,7 @@ function uiLayers() {
     const c = new Canvas(44, 24);
     word(c, 'SONIC', 2, 2, ['1', '2', '3'], (i) => Math.round(Math.sin((f / 10 + i / 5) * 2 * Math.PI)));
     word(c, 'HEIST', 2, 14, ['4', '5', '6'], () => 0);
-    return { body: c.svg(LOGO_PAL), ms: 110 };
+    return { px: c.colours(LOGO_PAL), ms: 110 };
   });
   write('logo.svg', flipbook('logo', 44, 24, logoFrames));
 }
