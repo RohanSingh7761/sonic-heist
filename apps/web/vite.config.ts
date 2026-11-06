@@ -29,6 +29,7 @@ export default defineConfig({
     port: 5173,
     allowedHosts: [
       '.loca.lt',
+      'sonicpay-demo.loca.lt',
       'breezy-bars-appear.loca.lt',
       'seven-gifts-cough.loca.lt',
       'localhost',
