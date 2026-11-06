@@ -108,7 +108,7 @@ export function AuthModal({ onSuccess }: Props) {
           )}
 
           <div style={{ marginTop: 8 }}>
-            <Btn tone="gold" big block disabled={loading}>
+            <Btn type="submit" tone="gold" big block disabled={loading} onClick={handleSubmit}>
               {loading ? 'Please wait...' : isLogin ? 'Log In' : 'Sign Up & Create Wallet'}
             </Btn>
           </div>
