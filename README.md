@@ -82,7 +82,7 @@ Gas is never taken from the vault. The loot amount is a percentage of the vault,
 
 1. **Vaults.** Players deposit ETH into their vault at any time. While a game is **active**, vault funds are locked and cannot be withdrawn. Withdrawals are possible only when the game is not active and the player has no loot in progress.
 2. **Looting needs consent from proximity.** A thief can only start a loot with a valid **ticket** signed by the victim's phone. The victim's phone signs a ticket automatically only after hearing a targeted loot request over ultrasound.
-3. **Random amount.** The loot is a random **5% to 25%** of the victim's current vault, computed on-chain. The thief cannot choose it. (Parameters are configurable at deployment.)
+3. **Random amount.** The loot is a random **5% to 25%** of the victim's current vault, computed on-chain, and at least 0.001 ETH. The thief cannot choose it. (Parameters are configurable at deployment.)
 4. **Thief bond.** Starting a loot locks a **bond** of 20% of the loot amount from the thief's own vault. A thief with an empty vault cannot loot.
 5. **Head start.** After the loot is recorded on-chain, the thief gets **10 seconds** before the victim is notified.
 6. **Hunt window.** The victim then has **60 seconds** to find the thief and cancel.
@@ -276,7 +276,7 @@ One contract, `HeistVault`, with no proxy and no upgrade path. It holds all vaul
 | `MIN_LOOT_BPS` | 500 (5%) | Lower bound of the random loot percentage |
 | `MAX_LOOT_BPS` | 2500 (25%) | Upper bound |
 | `BOND_BPS` | 2000 (20%) | Thief bond as a percentage of the loot amount |
-| `MIN_LOOT_AMOUNT` | 0.001 ETH | Dust floor; smaller loots are rejected |
+| `MIN_LOOT_AMOUNT` | 0.001 ETH | Smallest loot; lower rolls are raised to this, and a vault below it can't be looted |
 | `VICTIM_IMMUNITY` | 300 s | Protection after a loot is resolved |
 | `THIEF_COOLDOWN` | 120 s | Wait before the thief can loot again |
 
@@ -349,7 +349,7 @@ function setGameActive(bool active) external; // owner only
 5. Require the victim has no active loot and `block.timestamp >= immuneUntil[victim]`.
 6. Require the thief has no active loot and `block.timestamp >= thiefReadyAt[msg.sender]`.
 7. Compute a pseudo-random `bps` in `[MIN_LOOT_BPS, MAX_LOOT_BPS]` from `blockhash(block.number - 1)`, the victim, the ticket nonce and the loot id.
-8. `amount = vault[victim] * bps / 10000`; require `amount >= MIN_LOOT_AMOUNT`.
+8. `amount = max(vault[victim] * bps / 10000, MIN_LOOT_AMOUNT)`; require `amount <= vault[victim]`.
 9. `bond = amount * BOND_BPS / 10000`; require `vault[msg.sender] >= bond`.
 10. Move `amount` out of the victim's vault and `bond` out of the thief's vault into escrow (tracked on the loot record).
 11. Record `revealAt = now + HEAD_START`, `deadline = revealAt + HUNT_WINDOW`; set active-loot pointers.
@@ -703,7 +703,7 @@ Because the handshake and the cancel transaction take around 15 seconds in total
 | Ticket replay | Repeated loots | `usedTicket[victim][nonce]` and short `validBefore` |
 | Ticket stolen by another player | Loot started by a stranger | Ticket names the thief address; `startLoot` requires `msg.sender` to be that address |
 | Mempool front-running of `startLoot` | Someone else submits it | Same reason: only the named thief can use it |
-| Victim drained repeatedly | Total loss | Max 25% per loot, 5 minute immunity, one loot at a time |
+| Victim drained repeatedly | Total loss | Max 25% per loot (or 0.001 ETH if that's more, which can empty a small vault), 5 minute immunity, one loot at a time |
 | Thief spams loots | Grief | Bond, cooldown, one active loot |
 | Fake red highlight | Victim thinks the thief is near | Highlight is a hint; cancel needs the thief's signature on-chain |
 | Replay of a recorded `CATCH` | Thief signs a pointless `CAUGHT` | Verification requires the correct victim, loot and a fresh challenge; only the victim can submit `cancel` |

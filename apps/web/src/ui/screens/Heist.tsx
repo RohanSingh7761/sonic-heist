@@ -4,7 +4,7 @@ import { levelFor, MOCK_PLAYERS } from '../game';
 import { Btn, ClosenessMeter, Panel, Sprite, fmtEth, fmtTime, playerSprite, sfx, useLoop, closeness } from '../kit';
 import { MY_SEAT, RunStage, TableStage, pathToSeat, rivalSeat } from '../stages';
 import { Hud, tableSeats } from './Home';
-import { TICKET_TIME } from '../game';
+import { HANDSHAKE_TIME, TICKET_TIME } from '../game';
 
 type Props = {
   s: GameState;
@@ -13,6 +13,7 @@ type Props = {
   h: HeistState;
   onPulseRadar?: () => void;
   onCancelHeist?: () => void;
+  onClaimLoot?: () => Promise<void>;
 };
 
 const left = (h: HeistState, now: number) => (h.deadline ?? now) - now;
@@ -28,8 +29,8 @@ function Sneak({ s, h }: Props) {
   // Silent during acoustic ticket transmission
   const copy = {
     ticket: ['Sneaking in...', 'Sent the request. Waiting for their phone to sign a ticket.'],
-    grab: ['Grabbing the stake!', 'Ticket signed. The loot is locked in escrow on-chain.'],
-    disguise: ['Glasses on.', 'Nobody saw a thing. Get ready to run.'],
+    grab: ['Grabbing the stake!', 'Ticket signed. Locking the loot in escrow on-chain...'],
+    disguise: ['Glasses on.', 'The loot is locked in escrow. Get ready to run.'],
   }[h.phase as 'ticket' | 'grab' | 'disguise'];
   return (
     <main className="screen">
@@ -41,7 +42,7 @@ function Sneak({ s, h }: Props) {
       <Panel>
         <div className="heading">{copy[0]}</div>
         <p className="small-text muted">{copy[1]}</p>
-        {h.phase !== 'ticket' && <div className="spread" style={{ marginTop: 6 }}><span>Loot <b>{fmtEth(h.amount)} ETH</b></span><span>Bond <b>{fmtEth(h.bond)}</b></span></div>}
+        {h.phase === 'disguise' && <div className="spread" style={{ marginTop: 6 }}><span>Loot <b>{fmtEth(h.amount)} ETH</b></span><span>Bond <b>{fmtEth(h.bond)}</b></span></div>}
       </Panel>
       <p className="small-text muted" style={{ textAlign: 'center' }}>Only you can see this. Everyone else's table looks normal.</p>
     </main>
@@ -87,12 +88,19 @@ function Result({ mood, sprite, title, children, action }: { mood: string; sprit
   );
 }
 
-function Won({ s, send, h }: Props) {
+function Won({ s, send, h, onClaimLoot }: Props) {
   const level = levelFor(s.thefts + s.saves);
+  const [claiming, setClaiming] = useState(false);
   useEffect(() => { sfx('swag'); }, []);
+  const claim = async () => {
+    if (!onClaimLoot) return send({ type: 'claim' });
+    setClaiming(true);
+    await onClaimLoot();
+    setClaiming(false); // Still on this screen only if the claim failed, so the button can be tried again
+  };
   return (
     <Result mood="mood-gold" title="You got away!" sprite={<Sprite className="hero-sprite" avatar={s.avatar} level={level} state="swag" alt="Your avatar in gold chain and shades" />}
-      action={<Btn tone="teal" big block click="jackpot" onClick={() => send({ type: 'claim' })}>Claim +{fmtEth(h.amount + h.bond)} ETH</Btn>}>
+      action={<Btn tone="teal" big block disabled={claiming} click="jackpot" onClick={claim}>{claiming ? 'Claiming on-chain...' : `Claim +${fmtEth(h.amount + h.bond)} ETH`}</Btn>}>
       <Panel className="small-text">
         <div className="spread"><span>Stolen from {h.rival.name}</span><b>+{fmtEth(h.amount)}</b></div>
         <div className="spread"><span>Your bond back</span><b>+{fmtEth(h.bond)}</b></div>
@@ -193,7 +201,7 @@ function Hunt({ s, send, h, now, onPulseRadar, onCancelHeist }: Props) {
       </Panel>
       <div className="grow" />
       {shaking ? (
-        <Panel><b>Catching them...</b><p className="small-text muted">Stay close. Exchanging signed messages, then cancelling on-chain.</p><div className="bar red"><div style={{ width: `${100 - (((h.phaseEnds as number) - now) / 4000) * 100}%` }} /></div></Panel>
+        <Panel><b>Catching them...</b><p className="small-text muted">Stay close. Exchanging signed messages, then cancelling on-chain.</p><div className="bar red"><div style={{ width: `${100 - (((h.phaseEnds as number) - now) / HANDSHAKE_TIME) * 100}%` }} /></div></Panel>
       ) : h.inRange ? (
         <Btn tone="red" big block click="bang" onClick={() => onCancelHeist ? onCancelHeist() : send({ type: 'cancel', now })}>Catch thief! Cancel heist</Btn>
       ) : (

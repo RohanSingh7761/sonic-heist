@@ -1,5 +1,5 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
-import { MOCK_PLAYERS, initialState, levelFor, reduce, type Action, type GameState, type Player, type View } from './game';
+import { LOG_KEY, MOCK_PLAYERS, initialState, levelFor, reduce, type Action, type GameState, type LogEntry, type Player, type View } from './game';
 import { AVATARS, Btn, Icon, LEVEL_TITLES, Sprite, setSoundOn, sfx, useNow } from './kit';
 import { soundFX } from '../game/soundFX';
 import { Pick, RoundStart, Setup, Title } from './screens/Intro';
@@ -12,7 +12,9 @@ import {
   PingMessage,
   PongMessage,
   LootReqMessage,
+  TicketMessage,
   CatchMessage,
+  CaughtMessage,
 } from '../protocol/types';
 import {
   decodeHeistMessage,
@@ -23,8 +25,49 @@ import {
   encodeCatch,
   encodeCaught,
 } from '../protocol/codecs';
-import { getPlayerName } from '../protocol/signatures';
-import { fetchOnChainBalances, depositToVault, withdrawFromVault } from '../chain/web3';
+import { bytesToHex, getPlayerName } from '../protocol/signatures';
+import {
+  fetchOnChainBalances,
+  depositToVault,
+  withdrawFromVault,
+  signLootTicket,
+  signCatch,
+  signCaught,
+  recoverCatchSigner,
+  startLootOnChain,
+  cancelLootOnChain,
+  claimLootOnChain,
+  fetchActiveLoots,
+  fetchLootStatus,
+  setChainLogger,
+  LOOT_CANCELLED,
+  LOOT_CLAIMED,
+  type ChainLoot,
+} from '../chain/web3';
+
+const MIN_SIGN_STAKE = 0.001; // HeistVault.MIN_LOOT_AMOUNT: every loot takes at least this, so a smaller vault can't be looted
+const TICKET_GAP_MS = 30_000;
+
+const uidOf = (address: string) => parseInt(address.slice(2, 10), 16) >>> 0;
+
+const playerFromUid = (uid: number): Player => ({
+  uid,
+  name: getPlayerName(uid),
+  avatar: (['nib', 'juno', 'rocco'] as const)[uid % 3],
+  level: ((uid % 3) + 1) as Player['level'],
+  signal: 0.9,
+  vault: 0.25,
+});
+
+const lootAction = (role: 'thief' | 'victim', loot: ChainLoot): Action => {
+  const rivalAddress = role === 'thief' ? loot.victim : loot.thief;
+  return { type: 'lootOnChain', now: Date.now(), role, rival: playerFromUid(uidOf(rivalAddress)), rivalAddress, loot };
+};
+
+const chainError = (err: any): string => err?.cause?.data?.errorName ?? err?.shortMessage ?? err?.message ?? 'Transaction failed';
+// Fuller than the toast: viem's details hold the node's own reason, like "insufficient funds for gas".
+const errorDetail = (err: any): string => [chainError(err), err?.details].filter(Boolean).join(' | ');
+const uidHex = (uid: number) => uid.toString(16).toUpperCase().padStart(8, '0');
 
 function getInitialUser() {
   const savedUser = localStorage.getItem('sonic_heist_user');
@@ -106,6 +149,42 @@ export function UiApp() {
   const [s, send] = useReducer(reduce, currentUser.username, initialState);
   const now = useNow();
 
+  const logEvent = (kind: LogEntry['kind'], text: string) => send({ type: 'logEvent', kind, text, at: Date.now() });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOG_KEY, JSON.stringify(s.log));
+    } catch {
+      // Storage full or blocked: the log still works until the next refresh.
+    }
+  }, [s.log]);
+
+  // Anything nothing else caught still reaches the log, and so does anything on-chain.
+  useEffect(() => {
+    setChainLogger(logEvent);
+    const onError = (e: ErrorEvent) => logEvent('bad', `Crash: ${e.message} (${e.filename}:${e.lineno})`);
+    const onRejection = (e: PromiseRejectionEvent) => logEvent('bad', `Unhandled error: ${errorDetail(e.reason)}`);
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    logEvent('info', `App opened. Wallet ${currentUser.walletAddress}, uid ${uidHex(uidOf(currentUser.walletAddress))}`);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
+  const transmit = async (label: string, bytes: Uint8Array, protocol: number, volume: number) => {
+    logEvent('info', `Sound out: ${label}, ${bytes.length} bytes, protocol ${protocol}, volume ${volume}`);
+    try {
+      const result = await modem.transmit(bytes, protocol, volume);
+      logEvent('info', `Sound out done: ${label}, played ${(result.durationMs / 1000).toFixed(2)} s`);
+      return result;
+    } catch (err) {
+      logEvent('bad', `Sound out failed: ${label}: ${errorDetail(err)}`);
+      throw err;
+    }
+  };
+
   // Initialize wallet fields in state
   useEffect(() => {
     if (currentUser) {
@@ -118,17 +197,65 @@ export function UiApp() {
     }
   }, [currentUser]);
 
+  const refreshBalances = async () => {
+    try {
+      const res = await fetchOnChainBalances(currentUserRef.current.walletAddress as `0x${string}`);
+      if (res.stakeEth !== sRef.current.stake || res.walletEth !== sRef.current.wallet) {
+        logEvent('info', `Chain: stake ${res.stakeEth} ETH, wallet ${res.walletEth} ETH`);
+      }
+      send({ type: 'setBalances', wallet: res.walletEth, stake: res.stakeEth, immuneUntil: res.immuneUntilMs, readyAt: res.readyAtMs });
+    } catch (err) {
+      logEvent('bad', `Chain: balance read failed: ${errorDetail(err)}`);
+    }
+  };
+
   // Synchronize on-chain Base Sepolia balance and vault stake
   useEffect(() => {
     if (!currentUser.walletAddress) return;
-    const loadBalances = async () => {
-      const res = await fetchOnChainBalances(currentUser.walletAddress as `0x${string}`);
-      if (res) {
-        send({ type: 'setBalances', wallet: res.walletEth, stake: res.stakeEth });
+    refreshBalances();
+    const interval = setInterval(refreshBalances, 12000); // Poll Base Sepolia every 12s
+    return () => clearInterval(interval);
+  }, [currentUser.walletAddress]);
+
+  // The chain decides how a heist goes. Polling also tells a victim they were robbed, and restores a heist after a refresh.
+  useEffect(() => {
+    const address = currentUser.walletAddress as `0x${string}`;
+    if (!address) return;
+    let busy = false;
+    const syncLoot = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const h = sRef.current.heist;
+        if (h?.lootId != null) {
+          if (h.phase === 'caught' || h.phase === 'saved') return;
+          const status = await fetchLootStatus(h.lootId);
+          if (status === LOOT_CANCELLED || status === LOOT_CLAIMED) {
+            logEvent('info', `Chain: loot #${h.lootId} ${status === LOOT_CANCELLED ? 'cancelled' : 'claimed'}`);
+            send({ type: 'lootResolved', status: status === LOOT_CANCELLED ? 'cancelled' : 'claimed', now: Date.now() });
+            refreshBalances();
+          }
+        } else if (!h) {
+          const { asThief, asVictim } = await fetchActiveLoots(address);
+          if (sRef.current.heist) return;
+          const now = Date.now();
+          if (asThief) {
+            logEvent('info', `Chain: resuming loot #${asThief.lootId} as thief, ${asThief.amount} ETH`);
+            send(lootAction('thief', asThief));
+          // Stay quiet during the head start. Past the deadline there is nothing left to hunt.
+          } else if (asVictim && now >= asVictim.revealAt && now < asVictim.deadline) {
+            logEvent('info', `Chain: robbed in loot #${asVictim.lootId}, ${asVictim.amount} ETH, ${Math.round((asVictim.deadline - now) / 1000)} s left`);
+            send(lootAction('victim', asVictim));
+          }
+        }
+      } catch (err) {
+        logEvent('bad', `Chain: loot sync failed: ${errorDetail(err)}`);
+      } finally {
+        busy = false;
       }
     };
-    loadBalances();
-    const interval = setInterval(loadBalances, 12000); // Poll Base Sepolia every 12s
+    syncLoot();
+    const interval = setInterval(syncLoot, 3000);
     return () => clearInterval(interval);
   }, [currentUser.walletAddress]);
 
@@ -145,6 +272,8 @@ export function UiApp() {
   const sRef = useRef(s);
   const audioProtocolRef = useRef(audioProtocol);
   const currentUserRef = useRef(currentUser);
+  const lastTicketAt = useRef(0);
+  const pendingCatch = useRef<{ lootId: number; challenge: Uint8Array } | null>(null);
 
   useEffect(() => {
     sRef.current = s;
@@ -161,10 +290,10 @@ export function UiApp() {
       soundFX.preload();
       const ctx = modem.ensureAudioContext();
       if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+        ctx.resume().catch((err) => logEvent('bad', `Audio resume failed: ${errorDetail(err)}`));
       }
       if (sRef.current.micOk && (sRef.current.patrol || sRef.current.heist !== null)) {
-        ensureListening().catch(() => {});
+        ensureListening().catch(() => {}); // Logged inside
       }
     };
     window.addEventListener('pointerdown', resumeAudio);
@@ -182,61 +311,64 @@ export function UiApp() {
   const handleIncomingAudio = (bytes: Uint8Array) => {
     // 1. Acoustic test chirp
     if (bytes.length === 5 && bytes[0] === 0x53 && bytes[1] === 0x4f && bytes[2] === 0x4e) {
+      logEvent('good', 'Sound in: test chirp');
       sfx('coin');
       send({ type: 'soundOk' });
       return;
     }
 
     const msg = decodeHeistMessage(bytes);
-    if (!msg) return;
+    if (!msg) {
+      logEvent('bad', `Sound in: unreadable, ${bytes.length} bytes, starts ${bytesToHex(bytes.slice(0, 4))}`);
+      return;
+    }
+    logEvent('info', `Sound in: ${MessageType[msg.type]}, ${bytes.length} bytes`);
+    const ignore = (reason: string) => logEvent('info', `Ignored ${MessageType[msg.type]}: ${reason}`);
 
     const myUid = getUid();
     const currentS = sRef.current;
     const proto = audioProtocolRef.current;
-    const vol = 75;
+    const vol = 85;
+    const privateKey = currentUserRef.current.privateKey as `0x${string}`;
 
     switch (msg.type) {
       case MessageType.PING: {
         const m = msg as PingMessage;
-        if (m.scannerUid === myUid) return; // Ignore our own broadcast!
+        if (m.scannerUid === myUid) return ignore('my own ping');
 
         const isRunningAsThief = currentS.heist?.role === 'thief' && (currentS.heist.phase === 'headstart' || currentS.heist.phase === 'hunted');
-        if (!currentS.patrol && !isRunningAsThief) return;
+        if (!currentS.patrol && !isRunningAsThief) return ignore('patrol is off');
 
         if (m.targetUid === 0 || m.targetUid === myUid || isRunningAsThief) {
+          const delay = m.targetUid === 0 ? 250 + Math.floor(Math.random() * 5) * 1500 : 250; // Random slot so phones answering a broadcast don't talk over each other; a PONG plays for 1.32 s
           // Respond with PONG over ultrasound (keep speaker quiet from audible sounds to avoid clashing)
           setTimeout(() => {
             const pong = encodePong({
               responderUid: myUid,
               echoNonce: m.nonce,
             });
-            modem.transmit(pong, proto, 85);
-          }, m.targetUid === 0 ? 250 + Math.floor(Math.random() * 5) * 1200 : 250); // Random slot so phones answering a broadcast don't talk over each other
+            transmit('PONG', pong, proto, vol).catch(() => {}); // Logged inside
+          }, delay);
+          logEvent('info', `Answering ${uidHex(m.scannerUid)} in ${delay} ms`);
+        } else {
+          ignore(`for ${uidHex(m.targetUid)}, not me`);
         }
         break;
       }
 
       case MessageType.PONG: {
         const m = msg as PongMessage;
-        if (m.responderUid === myUid) return; // Ignore our own echo!
+        if (m.responderUid === myUid) return ignore('my own echo');
+        logEvent('good', `Found ${getPlayerName(m.responderUid)} (${uidHex(m.responderUid)})`);
 
         // Target found! Play pleasant chime and vibrate
         sfx('coin');
         if ('vibrate' in navigator) navigator.vibrate?.([80, 50, 80]);
 
-        const pName = getPlayerName(m.responderUid);
-        const discovered: Player = {
-          uid: m.responderUid,
-          name: pName,
-          avatar: (['nib', 'juno', 'rocco'][m.responderUid % 3] || 'nib') as any,
-          level: ((m.responderUid % 3) + 1) as any,
-          signal: 0.9,
-          vault: 0.25,
-        };
-        send({ type: 'discoveredPlayer', player: discovered });
+        send({ type: 'discoveredPlayer', player: playerFromUid(m.responderUid) });
 
         // If currently hunting as victim, response confirms thief is caught in range!
-        if (currentS.heist?.role === 'victim' && (currentS.heist.phase === 'hunting' || currentS.heist.phase === 'handshake')) {
+        if (currentS.heist?.role === 'victim' && m.responderUid === currentS.heist.rival.uid && (currentS.heist.phase === 'hunting' || currentS.heist.phase === 'handshake')) {
           sfx('thief-near');
           send({ type: 'thiefInRange', signal: 1.0 });
         }
@@ -245,77 +377,104 @@ export function UiApp() {
 
       case MessageType.LOOT_REQ: {
         const m = msg as LootReqMessage;
-        if (!currentS.patrol) return;
-        if (m.victimUid !== myUid) return;
-        if (Date.now() < currentS.immuneUntil) return;
+        // Auto-sign policy (README 9.4). Sound is unauthenticated, so stay silent unless all of this holds; the contract re-checks the rest.
+        const refusal = m.victimUid !== myUid ? `for ${uidHex(m.victimUid)}, not me`
+          : !privateKey ? 'no private key on this phone'
+          : !currentS.patrol ? 'patrol is off'
+          : currentS.shield ? 'shield is on'
+          : currentS.heist ? 'already in a heist'
+          : Date.now() < currentS.immuneUntil ? `immune for ${Math.ceil((currentS.immuneUntil - Date.now()) / 1000)} s`
+          : currentS.stake < MIN_SIGN_STAKE ? `stake ${currentS.stake} ETH is under ${MIN_SIGN_STAKE}`
+          : Date.now() - lastTicketAt.current < TICKET_GAP_MS ? `already signed a ticket ${Math.round((Date.now() - lastTicketAt.current) / 1000)} s ago`
+          : null;
+        if (refusal) return ignore(refusal);
+        lastTicketAt.current = Date.now();
+        logEvent('info', `Signing a ticket for thief ${m.thiefAddress}`);
 
-        // Auto-sign mock ticket and transmit back over ultrasound
-        const ticketBytes = encodeTicket({
-          thiefUid: parseInt(m.thiefAddress.slice(2, 10), 16),
-          nonce: BigInt(Math.floor(Math.random() * 100000) + 1),
-          validBefore: Math.floor(Date.now() / 1000) + 90,
-          signature: new Uint8Array(64).fill(0x55),
-        });
-        modem.transmit(ticketBytes, proto, vol);
-
-        // Schedule victim incoming alert for 10s later (end of headstart)
-        const targetThiefUid = parseInt(m.thiefAddress.slice(2, 10), 16);
-        const thiefName = getPlayerName(targetThiefUid);
-        setTimeout(() => {
-          send({
-            type: 'incoming',
-            now: Date.now(),
-            rival: {
-              uid: targetThiefUid,
-              name: thiefName,
-              avatar: (['juno', 'nib', 'rocco'][targetThiefUid % 3] || 'juno') as any,
-              level: 2,
-              signal: 0.5,
-              vault: 0.3,
-            },
-            lootRate: 0.15,
-          });
-        }, 10000);
+        const nonce = crypto.getRandomValues(new BigUint64Array(1))[0];
+        // shortcut: uses this phone's clock, not the chain's. 90 s hides normal drift; read the latest block if tickets expire early.
+        const validBefore = Math.floor(Date.now() / 1000) + 90;
+        signLootTicket(privateKey, m.thiefAddress, nonce, validBefore)
+          .then((signature) => transmit('TICKET', encodeTicket({ thiefUid: uidOf(m.thiefAddress), nonce, validBefore, signature }), proto, vol))
+          .catch((err) => logEvent('bad', `Ticket failed: ${errorDetail(err)}`));
         break;
       }
 
       case MessageType.TICKET: {
+        const m = msg as TicketMessage;
+        if (m.thiefUid !== myUid) return ignore(`for ${uidHex(m.thiefUid)}, not me`);
+        if (currentS.heist?.phase !== 'ticket') return ignore(`not waiting for one (phase: ${currentS.heist?.phase ?? 'no heist'})`);
+        logEvent('info', `Ticket valid for ${m.validBefore - Math.floor(Date.now() / 1000)} s, starting the loot`);
         send({ type: 'ticketReceived' });
+        startLootOnChain(privateKey, m.nonce, m.validBefore, m.signature)
+          .then((loot) => {
+            logEvent('good', `Loot #${loot.lootId} started: ${loot.amount} ETH from ${loot.victim}, bond ${loot.bond} ETH`);
+            send(lootAction('thief', loot));
+            refreshBalances();
+          })
+          .catch((err) => {
+            logEvent('bad', `startLoot failed: ${errorDetail(err)}`);
+            send({ type: 'lootFailed', message: `Loot failed: ${chainError(err)}` });
+          });
         break;
       }
 
       case MessageType.CATCH: {
         const m = msg as CatchMessage;
-        if (currentS.heist?.role !== 'thief') return;
-        // Echo CAUGHT signature back over ultrasound
-        const caughtBytes = encodeCaught({
-          lootId: m.lootId,
-          challenge: m.challenge,
-          signature: new Uint8Array(64).fill(0x77),
-        });
-        modem.transmit(caughtBytes, proto, vol);
-        send({ type: 'victimFoundMe', now: Date.now() });
-        break;
+        const h = currentS.heist;
+        if (h?.role !== 'thief') return ignore('not running as a thief');
+        if (h.lootId !== m.lootId || !h.rivalAddress) return ignore(`for loot #${m.lootId}, mine is #${h.lootId}`);
+        if (!h.deadline || Date.now() >= h.deadline) return ignore('the deadline has passed');
+        const victim = h.rivalAddress as `0x${string}`;
+        recoverCatchSigner(m.lootId, m.challenge, m.signature)
+          .then(async (signer) => {
+            if (signer.toLowerCase() !== victim.toLowerCase()) return ignore(`signed by ${signer}, not my victim`);
+            logEvent('info', 'Victim proved the catch, signing CAUGHT');
+            const signature = await signCaught(privateKey, m.lootId, victim, m.challenge);
+            await transmit('CAUGHT', encodeCaught({ lootId: m.lootId, challenge: m.challenge, signature }), proto, vol);
+          })
+          .catch((err) => logEvent('bad', `Catch reply failed: ${errorDetail(err)}`));
+        break; // The Busted screen waits for the cancel to land on-chain (see syncLoot)
       }
 
       case MessageType.CAUGHT: {
-        if (currentS.heist?.role !== 'victim') return;
-        send({ type: 'caughtHandshake' });
+        const m = msg as CaughtMessage;
+        const pending = pendingCatch.current;
+        if (!pending) return ignore('no catch in progress');
+        if (pending.lootId !== m.lootId || bytesToHex(pending.challenge) !== bytesToHex(m.challenge)) return ignore('answers a different catch');
+        logEvent('info', `Thief answered, cancelling loot #${m.lootId}`);
+        pendingCatch.current = null;
+        cancelLootOnChain(privateKey, m.lootId, m.challenge, m.signature)
+          .then(() => {
+            send({ type: 'caughtHandshake' });
+            refreshBalances();
+          })
+          .catch((err) => {
+            logEvent('bad', `cancel failed: ${errorDetail(err)}`);
+            send({ type: 'lootFailed', message: `Catch failed: ${chainError(err)}` });
+          });
         break;
       }
     }
   };
 
   const ensureListening = async () => {
-    await modem.startListening((bytes: Uint8Array) => {
-      handleIncomingAudio(bytes);
-    });
+    if (modem.getListeningStatus()) return;
+    try {
+      await modem.startListening((bytes: Uint8Array) => {
+        handleIncomingAudio(bytes);
+      });
+      logEvent('good', 'Microphone listening');
+    } catch (err) {
+      logEvent('bad', `Microphone failed: ${errorDetail(err)}`);
+      throw err;
+    }
   };
 
   // Initialize ggwave audio modem
   useEffect(() => {
     modem.loadLibrary().catch((err) => {
-      console.warn('Audio init error:', err);
+      logEvent('bad', `Audio library failed: ${errorDetail(err)}`);
     });
 
     return () => {
@@ -344,7 +503,7 @@ export function UiApp() {
 
   const onSoundCheck = async () => {
     const testBytes = new Uint8Array([0x53, 0x4f, 0x4e, 0x49, 0x43]); // "SONIC"
-    await modem.transmit(testBytes, audioProtocol, 75);
+    await transmit('test chirp', testBytes, audioProtocol, 75);
     localStorage.setItem('sonic_sound_ok', 'true');
     send({ type: 'soundOk' });
     sfx('coin');
@@ -356,7 +515,7 @@ export function UiApp() {
       targetUid: 0,
       nonce: Math.floor(Math.random() * 0xffff),
     });
-    modem.transmit(ping, audioProtocol, 85);
+    transmit('PING (scan)', ping, audioProtocol, 85).catch(() => {}); // Logged inside
     send({ type: 'scan', now: Date.now() });
   };
 
@@ -366,8 +525,9 @@ export function UiApp() {
       thiefAddress: myAddr,
       victimUid: target.uid,
     });
-    modem.transmit(req, audioProtocol, 85);
-    send({ type: 'rob', now: Date.now(), lootRate: 0.15 });
+    logEvent('info', `Robbing ${target.name} (${uidHex(target.uid)})`);
+    transmit('LOOT_REQ', req, audioProtocol, 85).catch(() => {}); // Logged inside
+    send({ type: 'rob', now: Date.now() });
   };
 
   const onPulseRadar = async () => {
@@ -377,20 +537,35 @@ export function UiApp() {
       targetUid: s.heist?.rival.uid || 0,
       nonce: Math.floor(Math.random() * 0xffff),
     });
-    await modem.transmit(ping, audioProtocol, 85);
+    await transmit('PING (radar)', ping, audioProtocol, 85);
   };
 
   const onCancelHeist = async () => {
     send({ type: 'cancel', now: Date.now() });
-    const catchMsg = encodeCatch({
-      lootId: 101,
-      challenge: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]),
-      signature: new Uint8Array(64).fill(0x33),
-    });
-    await modem.transmit(catchMsg, audioProtocol, 75);
-    setTimeout(() => {
-      modem.transmit(catchMsg, audioProtocol, 75).catch(() => {});
-    }, 350);
+    const lootId = s.heist?.lootId;
+    if (lootId == null) return; // Demo heist: nothing on-chain
+    try {
+      const challenge = crypto.getRandomValues(new Uint8Array(8));
+      pendingCatch.current = { lootId, challenge };
+      const signature = await signCatch(currentUserRef.current.privateKey as `0x${string}`, lootId, challenge);
+      await transmit('CATCH', encodeCatch({ lootId, challenge, signature }), audioProtocol, 85);
+    } catch (err) {
+      logEvent('bad', `Catch failed: ${errorDetail(err)}`);
+      send({ type: 'lootFailed', message: `Catch failed: ${chainError(err)}` });
+    }
+  };
+
+  const onClaimLoot = async () => {
+    const lootId = s.heist?.lootId;
+    if (lootId == null) return send({ type: 'claim' }); // Demo heist: nothing on-chain
+    try {
+      await claimLootOnChain(currentUserRef.current.privateKey as `0x${string}`, lootId);
+      send({ type: 'claim' });
+      await refreshBalances();
+    } catch (err) {
+      logEvent('bad', `claim failed: ${errorDetail(err)}`);
+      send({ type: 'lootFailed', message: `Claim failed: ${chainError(err)}` });
+    }
   };
 
   // Requirement 4: Real on-chain Base Sepolia deposit & withdraw
@@ -404,14 +579,10 @@ export function UiApp() {
       sfx('coin');
       const { hash } = await depositToVault(currentUserRef.current.privateKey as `0x${string}`, amountEth);
       alert(`On-chain deposit sent to Base Sepolia!\nTx: ${hash.slice(0, 16)}...`);
-      // Refresh balances
-      const res = await fetchOnChainBalances(currentUserRef.current.walletAddress as `0x${string}`);
-      if (res) {
-        send({ type: 'setBalances', wallet: res.walletEth, stake: res.stakeEth });
-      }
+      await refreshBalances();
     } catch (err: any) {
-      console.error('Deposit error:', err);
-      alert('Base Sepolia Deposit failed: ' + (err?.shortMessage || err?.message || err));
+      logEvent('bad', `deposit failed: ${errorDetail(err)}`);
+      alert('Base Sepolia Deposit failed: ' + chainError(err));
     }
   };
 
@@ -424,23 +595,21 @@ export function UiApp() {
       sfx('coin');
       const { hash } = await withdrawFromVault(currentUserRef.current.privateKey as `0x${string}`, amountEth);
       alert(`On-chain withdrawal completed on Base Sepolia!\nTx: ${hash.slice(0, 16)}...`);
-      const res = await fetchOnChainBalances(currentUserRef.current.walletAddress as `0x${string}`);
-      if (res) {
-        send({ type: 'setBalances', wallet: res.walletEth, stake: res.stakeEth });
-      }
+      await refreshBalances();
     } catch (err: any) {
-      console.error('Withdraw error:', err);
-      alert('Base Sepolia Withdraw failed: ' + (err?.shortMessage || err?.message || err));
+      logEvent('bad', `withdraw failed: ${errorDetail(err)}`);
+      alert('Base Sepolia Withdraw failed: ' + chainError(err));
     }
   };
 
   const onTestChirp = () => {
     const testBytes = new Uint8Array([0x53, 0x4f, 0x4e, 0x49, 0x43]);
-    modem.transmit(testBytes, audioProtocol, 75);
+    transmit('test chirp', testBytes, audioProtocol, 75).catch(() => {}); // Logged inside
   };
 
   useEffect(() => {
     if (!s.notice) return;
+    logEvent('bad', s.notice);
     sfx('ui-deny');
     const id = setTimeout(() => send({ type: 'clearNotice' }), 3200);
     return () => clearTimeout(id);
@@ -452,8 +621,12 @@ export function UiApp() {
     const was = prev.current;
     const h = s.heist;
     prev.current = h;
-    if (!h) return;
+    if (!h) {
+      if (was) logEvent('info', `Heist over (was ${was.phase})`);
+      return;
+    }
     if (h.phase !== was?.phase) {
+      logEvent('info', `Heist: ${was?.phase ?? 'start'} -> ${h.phase} (${h.role})`);
       if (h.phase === 'grab') sfx('loot-grab');
       if (h.phase === 'disguise') sfx('bling');
       if (h.phase === 'headstart') sfx('dash');
@@ -484,6 +657,7 @@ export function UiApp() {
     onSoundCheck,
     onPulseRadar,
     onCancelHeist,
+    onClaimLoot,
     onDepositOnChain,
     onWithdrawOnChain,
   };

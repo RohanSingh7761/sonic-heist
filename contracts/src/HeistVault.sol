@@ -175,8 +175,10 @@ contract HeistVault {
         uint256 bps = MIN_LOOT_BPS + (rand % (MAX_LOOT_BPS - MIN_LOOT_BPS + 1));
 
         // 4. Calculate loot amount and required thief bond
+        // A low roll on a small vault takes the minimum instead of failing, so only a nearly empty vault is safe.
         uint256 lootAmount = (vault[victim] * bps) / 10000;
-        if (lootAmount < MIN_LOOT_AMOUNT) revert LootAmountTooLow();
+        if (lootAmount < MIN_LOOT_AMOUNT) lootAmount = MIN_LOOT_AMOUNT;
+        if (lootAmount > vault[victim]) revert LootAmountTooLow();
 
         uint256 bondAmount = (lootAmount * BOND_BPS) / 10000;
         if (vault[msg.sender] < bondAmount) revert InsufficientVaultBalance();

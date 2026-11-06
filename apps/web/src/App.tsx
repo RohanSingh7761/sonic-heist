@@ -226,7 +226,7 @@ export default function App() {
             });
             modem.transmit(pong, proto, vol);
             addLog(`Sent PONG reply (UID: 0x${currentBurner.uid.toString(16)}).`, 'info');
-          }, m.targetUid === 0 ? 250 + Math.floor(Math.random() * 5) * 1200 : 250); // Random slot so phones answering a broadcast don't talk over each other
+          }, m.targetUid === 0 ? 250 + Math.floor(Math.random() * 5) * 1500 : 250); // Random slot so phones answering a broadcast don't talk over each other; a PONG plays for 1.32 s
         }
         break;
       }
@@ -592,7 +592,7 @@ export default function App() {
               className="text-[10px] font-mono text-emerald-400 hover:text-emerald-300 underline flex items-center gap-1"
               title="View verified contract on Blockscout"
             >
-              0xd219...eAb7
+              0xb8C5...5FFA
             </a>
             <div
               className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border ${

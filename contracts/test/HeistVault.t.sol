@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 interface Vm {
+    function addr(uint256) external pure returns (address);
     function warp(uint256) external;
     function roll(uint256) external;
     function deal(address, uint256) external;
@@ -187,10 +188,38 @@ contract HeistVaultTest {
         vault.startLoot(nonce, validBefore, ticketSig);
     }
 
+    function test_StartLoot_SmallVaultTakesTheMinimum() public {
+        // 25% of 0.002 ETH is under the minimum, so every roll lands on the floor.
+        vm.prank(stranger);
+        vault.deposit{value: 0.002 ether}();
+
+        uint64 nonce = 1007;
+        uint32 validBefore = uint32(block.timestamp + 90);
+        bytes memory ticketSig = signTicket(strangerKey, thief, nonce, validBefore);
+
+        vm.prank(thief);
+        vault.startLoot(nonce, validBefore, ticketSig);
+
+        assertEq(vault.vault(stranger), 0.001 ether);
+    }
+
+    function test_Revert_VaultBelowTheMinimum() public {
+        vm.prank(stranger);
+        vault.deposit{value: 0.0009 ether}();
+
+        uint64 nonce = 1008;
+        uint32 validBefore = uint32(block.timestamp + 90);
+        bytes memory ticketSig = signTicket(strangerKey, thief, nonce, validBefore);
+
+        vm.prank(thief);
+        vm.expectRevert(HeistVault.LootAmountTooLow.selector);
+        vault.startLoot(nonce, validBefore, ticketSig);
+    }
+
     // --- Helpers ---
     function vmAddr(uint256 privKey) internal pure returns (address) {
-        // Simple deterministic address generator from privKey for testing
-        return address(uint160(uint256(keccak256(abi.encodePacked(privKey)))));
+        // Must be the key's real address: tickets signed with vm.sign recover to it.
+        return vm.addr(privKey);
     }
 
     function signTicket(

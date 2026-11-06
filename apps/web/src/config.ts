@@ -4,8 +4,8 @@ export const CONFIG = {
   chainId: 84532,
   chainName: 'Base Sepolia',
   rpcUrl: 'https://base-sepolia.g.alchemy.com/v2/alch_bH1hVFNxdA8htgBUYZCpf',
-  heistVaultAddress: '0xd21904c952F6a9ac4Db73a3d3F08675ACec7eAb7' as `0x${string}`,
-  blockExplorer: 'https://base-sepolia.blockscout.com/address/0xd21904c952F6a9ac4Db73a3d3F08675ACec7eAb7',
+  heistVaultAddress: '0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA' as `0x${string}`,
+  blockExplorer: 'https://base-sepolia.blockscout.com/address/0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA',
 };
 
 export const HEIST_VAULT_ABI = [
@@ -88,6 +88,36 @@ export const HEIST_VAULT_ABI = [
     stateMutability: 'view',
   },
   {
+    type: 'function',
+    name: 'activeLootAsThief',
+    inputs: [{ name: 'player', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'activeLootAsVictim',
+    inputs: [{ name: 'player', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'loots',
+    inputs: [{ name: 'lootId', type: 'uint256' }],
+    outputs: [
+      { name: 'thief', type: 'address' },
+      { name: 'victim', type: 'address' },
+      { name: 'amount', type: 'uint128' },
+      { name: 'bond', type: 'uint128' },
+      { name: 'startedAt', type: 'uint40' },
+      { name: 'revealAt', type: 'uint40' },
+      { name: 'deadline', type: 'uint40' },
+      { name: 'status', type: 'uint8' },
+    ],
+    stateMutability: 'view',
+  },
+  {
     type: 'event',
     name: 'LootStarted',
     inputs: [
@@ -119,4 +149,20 @@ export const HEIST_VAULT_ABI = [
       { name: 'amount', type: 'uint256', indexed: false },
     ],
   },
+  { type: 'error', name: 'Unauthorized', inputs: [] },
+  { type: 'error', name: 'GameNotActive', inputs: [] },
+  { type: 'error', name: 'GameIsActive', inputs: [] },
+  { type: 'error', name: 'ActiveLootInProgress', inputs: [] },
+  { type: 'error', name: 'TicketExpired', inputs: [] },
+  { type: 'error', name: 'TicketAlreadyUsed', inputs: [] },
+  { type: 'error', name: 'InvalidSignature', inputs: [] },
+  { type: 'error', name: 'SelfLootNotAllowed', inputs: [] },
+  { type: 'error', name: 'VictimIsImmune', inputs: [] },
+  { type: 'error', name: 'ThiefOnCooldown', inputs: [] },
+  { type: 'error', name: 'LootAmountTooLow', inputs: [] },
+  { type: 'error', name: 'InsufficientVaultBalance', inputs: [] },
+  { type: 'error', name: 'LootNotActive', inputs: [] },
+  { type: 'error', name: 'DeadlinePassed', inputs: [] },
+  { type: 'error', name: 'DeadlineNotReached', inputs: [] },
+  { type: 'error', name: 'TransferFailed', inputs: [] },
 ] as const;

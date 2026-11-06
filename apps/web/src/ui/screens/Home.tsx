@@ -171,11 +171,11 @@ export function Scan({ s, send, now, onScan, onRobTarget }: Props) {
       {done && (
         <div className="sticky-action">
           {target ? (
-            <Btn tone="red" big block click="heist-start" onClick={() => (onRobTarget && target ? onRobTarget(target) : send({ type: 'rob', now, lootRate: 0.05 + Math.random() * 0.2 }))}>Rob {target.name.split(' ').slice(0, 2).join(' ')}</Btn>
+            <Btn tone="red" big block click="heist-start" onClick={() => (onRobTarget && target ? onRobTarget(target) : send({ type: 'rob', now }))}>Rob {target.name.split(' ').slice(0, 2).join(' ')}</Btn>
           ) : (
             <Btn big block click={null} onClick={() => (onScan ? onScan() : send({ type: 'scan', now }))}>Scan again</Btn>
           )}
-          {target && <p className="small-text muted" style={{ textAlign: 'center' }}>Takes 5% to 25% of their stake. Your bond: 20% of the loot.</p>}
+          {target && <p className="small-text muted" style={{ textAlign: 'center' }}>Takes 5% to 25% of their stake, at least 0.001 ETH. Your bond: 20% of the loot.</p>}
         </div>
       )}
     </main>
@@ -217,14 +217,24 @@ export function Levels({ s, send }: Props) {
   );
 }
 
-export function Log({ s }: Props) {
+export function Log({ s, send }: Props) {
   return (
     <main className="screen">
-      <h1 className="title">Activity</h1>
+      <div className="spread">
+        <h1 className="title">Activity</h1>
+        {s.log.length > 0 && <Btn small style={{ flex: 'none' }} onClick={() => send({ type: 'clearLog' })}>Clear</Btn>}
+      </div>
       <Panel className="grow">
-        {s.log.length === 0 && <p className="muted">Nothing yet. Your thefts and saves will show up here.</p>}
+        {s.log.length === 0 && <p className="muted">Nothing yet. Sound, transactions and errors will show up here.</p>}
         {s.log.map((e) => (
-          <div key={e.id} className="log-row"><div className={`log-dot ${e.kind}`} /><div>{e.text}</div></div>
+          <div key={e.id} className="log-row">
+            <div className={`log-dot ${e.kind}`} />
+            <div style={{ overflowWrap: 'anywhere' }}>
+              {e.at > 0 && <span className="small-text muted">{new Date(e.at).toLocaleTimeString()} </span>}
+              {e.text}
+              {e.count && <b> x{e.count}</b>}
+            </div>
+          </div>
         ))}
       </Panel>
     </main>

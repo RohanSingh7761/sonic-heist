@@ -28,7 +28,7 @@ import {
 } from '../app/src/protocol/signatures';
 
 const RPC_URL = process.env.RPC_URL || 'https://base-sepolia.g.alchemy.com/v2/alch_bH1hVFNxdA8htgBUYZCpf';
-const HEIST_VAULT_ADDRESS = (process.env.HEIST_VAULT_ADDRESS || '0xd21904c952F6a9ac4Db73a3d3F08675ACec7eAb7') as `0x${string}`;
+const HEIST_VAULT_ADDRESS = (process.env.HEIST_VAULT_ADDRESS || '0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA') as `0x${string}`;
 
 console.log('--- Sonic Heist Simulation ---');
 console.log(`Target Network: Base Sepolia (Chain ID ${baseSepolia.id})`);

@@ -28,6 +28,10 @@ export interface Heist {
   pulses: number;
   signal: number;
   inRange: boolean;
+  // Set once the loot exists on-chain. Demo heists have none of these.
+  lootId?: number;
+  rivalAddress?: string;
+  revealAt?: number;
 }
 
 export interface LogEntry {
@@ -35,6 +39,7 @@ export interface LogEntry {
   at: number;
   kind: 'good' | 'bad' | 'info';
   text: string;
+  count?: number; // How many times in a row this line happened
 }
 
 export interface GameState {
@@ -71,11 +76,12 @@ export const IMMUNITY = 300_000;
 export const COOLDOWN = 120_000;
 export const BOND_RATE = 0.2;
 export const MIN_LOOT = 0.001;
-export const SCAN_TIME = 6_000;
-export const TICKET_TIME = 3_500;
-export const GRAB_TIME = 1_800;
+// The last reply slot ends about 9 s after the tap: PING 1.45 s, then up to 6.25 s of waiting, then PONG 1.32 s.
+export const SCAN_TIME = 10_000;
+// Signed messages take about 5 s to play over ultrasound, and each of these timers covers two of them.
+export const TICKET_TIME = 15_000;
 export const DISGUISE_TIME = 1_600;
-export const HANDSHAKE_TIME = 4_000;
+export const HANDSHAKE_TIME = 20_000;
 export const PULSES_TO_FIND = 1; // Immediate detection upon acoustic radar pulse
 
 // shortcut: placeholder thresholds, set the real numbers once the team decides them.
@@ -89,7 +95,20 @@ export const MOCK_PLAYERS: Player[] = [
   { uid: 0xb3d9, name: 'Sly Newt B3D9', avatar: 'juno', level: 2, signal: 0.15, vault: 0.2 },
 ];
 
+export const LOG_KEY = 'sonic_heist_log';
+const LOG_LIMIT = 300;
+
+function savedLog(): LogEntry[] {
+  try {
+    const saved = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem(LOG_KEY) ?? '[]') : [];
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
 export const initialState = (name: string): GameState => {
+  const entries = savedLog();
   const micOk = typeof window !== 'undefined' && localStorage.getItem('sonic_mic_ok') === 'true';
   const soundOk = typeof window !== 'undefined' && localStorage.getItem('sonic_sound_ok') === 'true';
   const ready = micOk && soundOk;
@@ -115,8 +134,8 @@ export const initialState = (name: string): GameState => {
     heist: null,
     levelUpTo: null,
     notice: null,
-    log: [],
-    logSeq: 0,
+    log: entries,
+    logSeq: entries[0]?.id ?? 0,
   };
 };
 
@@ -134,7 +153,10 @@ export type Action =
   | { type: 'ticketReceived' }
   | { type: 'thiefInRange'; signal: number }
   | { type: 'caughtHandshake' }
-  | { type: 'rob'; now: number; lootRate: number }
+  | { type: 'rob'; now: number }
+  | { type: 'lootOnChain'; now: number; role: 'thief' | 'victim'; rival: Player; rivalAddress: string; loot: { lootId: number; amount: number; bond: number; revealAt: number; deadline: number } }
+  | { type: 'lootFailed'; message: string }
+  | { type: 'lootResolved'; status: 'cancelled' | 'claimed'; now: number }
   | { type: 'incoming'; now: number; rival: Player; lootRate: number }
   | { type: 'hunt' }
   | { type: 'pulse' }
@@ -144,9 +166,11 @@ export type Action =
   | { type: 'dismiss' }
   | { type: 'clearNotice' }
   | { type: 'clearLevelUp' }
-  | { type: 'setBalances'; wallet: number; stake: number }
+  | { type: 'setBalances'; wallet: number; stake: number; immuneUntil: number; readyAt: number }
   | { type: 'setUser'; name: string; walletAddress: string; privateKey: string }
   | { type: 'addWin' }
+  | { type: 'logEvent'; kind: LogEntry['kind']; text: string; at: number }
+  | { type: 'clearLog' }
   | { type: 'tick'; now: number }
   | { type: 'skip'; now: number }
   | { type: 'reset'; name: string };
@@ -154,8 +178,11 @@ export type Action =
 const eth = (n: number) => `${n.toFixed(4)} ETH`;
 
 function log(s: GameState, kind: LogEntry['kind'], text: string, at: number): GameState {
+  const [latest, ...rest] = s.log;
+  // A repeating failure, like a dropped network, counts up instead of pushing everything else out.
+  if (latest?.text === text) return { ...s, log: [{ ...latest, at, count: (latest.count ?? 1) + 1 }, ...rest] };
   const id = s.logSeq + 1;
-  return { ...s, logSeq: id, log: [{ id, at, kind, text }, ...s.log].slice(0, 50) };
+  return { ...s, logSeq: id, log: [{ id, at, kind, text }, ...s.log].slice(0, LOG_LIMIT) };
 }
 
 // Applies one win and flags a level-up if it crossed a threshold.
@@ -171,14 +198,9 @@ function step(s: GameState, h: Heist, at: number): GameState {
   const set = (patch: Partial<Heist>) => ({ ...s, heist: { ...h, ...patch } });
   switch (h.phase) {
     case 'ticket':
-      if (h.bond > s.stake) {
-        return log({ ...s, heist: null, notice: `You need ${eth(h.bond)} staked to cover the bond.` }, 'bad', `Heist on ${h.rival.name} failed: stake too low for the bond`, at);
-      }
-      return log({ ...s, stake: s.stake - h.bond, heist: { ...h, phase: 'grab', phaseEnds: at + GRAB_TIME } }, 'info', `Looting ${h.rival.name}: ${eth(h.amount)}, bond ${eth(h.bond)}`, at);
-    case 'grab':
-      return set({ phase: 'disguise', phaseEnds: at + DISGUISE_TIME });
+      return log({ ...s, heist: null, notice: `${h.rival.name} didn't answer. Get closer and try again.` }, 'info', `No ticket from ${h.rival.name}`, at);
     case 'disguise':
-      return set({ phase: 'headstart', phaseEnds: at + HEAD_START, deadline: at + HEAD_START + HUNT_WINDOW });
+      return set({ phase: 'headstart', phaseEnds: h.revealAt ?? at + HEAD_START, deadline: h.deadline ?? at + HEAD_START + HUNT_WINDOW });
     case 'headstart':
       return set({ phase: 'hunted', phaseEnds: h.deadline });
     case 'hunted':
@@ -186,6 +208,8 @@ function step(s: GameState, h: Heist, at: number): GameState {
     case 'alert':
       return set({ phase: 'hunting', phaseEnds: h.deadline });
     case 'handshake':
+      // A real catch only ends when the cancel lands on-chain, so running out of time here just allows another try.
+      if (h.lootId != null) return { ...s, notice: 'No answer from the thief. Stay close and try again.', heist: { ...h, phase: 'hunting', phaseEnds: h.deadline } };
       // The handshake only counts if it finished before the deadline.
       if (at < (h.deadline ?? 0)) {
         const saved = { ...s, stake: s.stake + h.amount + h.bond, immuneUntil: at + IMMUNITY, heist: { ...h, phase: 'saved' as const, phaseEnds: null } };
@@ -254,10 +278,38 @@ export function reduce(s: GameState, a: Action): GameState {
     }
     case 'ticketReceived': {
       if (!h || h.role !== 'thief' || h.phase !== 'ticket') return s;
-      return step(s, h, Date.now());
+      return { ...s, heist: { ...h, phase: 'grab', phaseEnds: null } }; // Waits here until startLoot lands
+    }
+    case 'lootOnChain': {
+      const { loot, rival, rivalAddress, now } = a;
+      const onChain = { rival, rivalAddress, lootId: loot.lootId, amount: loot.amount, bond: loot.bond, revealAt: loot.revealAt, deadline: loot.deadline, pulses: 0, signal: 0, inRange: false };
+      if (a.role === 'victim') {
+        if (h) return s;
+        return log({ ...s, heist: { ...onChain, role: 'victim', phase: 'alert', phaseEnds: now + 4_000 } }, 'bad', `${rival.name} robbed you of ${eth(loot.amount)}`, now);
+      }
+      if (h) {
+        if (h.phase !== 'grab') return s;
+        return log({ ...s, heist: { ...onChain, role: 'thief', phase: 'disguise', phaseEnds: now + DISGUISE_TIME } }, 'info', `Looting ${rival.name}: ${eth(loot.amount)}, bond ${eth(loot.bond)}`, now);
+      }
+      // No heist on this phone but one on-chain: the page was refreshed, so pick up where the chain says we are.
+      const resumed: Pick<Heist, 'phase' | 'phaseEnds'> = now < loot.revealAt ? { phase: 'headstart', phaseEnds: loot.revealAt } : now < loot.deadline ? { phase: 'hunted', phaseEnds: loot.deadline } : { phase: 'won', phaseEnds: null };
+      return { ...s, heist: { ...onChain, role: 'thief', ...resumed } };
+    }
+    case 'lootFailed':
+      if (h?.phase === 'grab') return { ...s, heist: null, notice: a.message };
+      if (h?.phase === 'handshake') return { ...s, notice: a.message, heist: { ...h, phase: 'hunting', phaseEnds: h.deadline } };
+      return { ...s, notice: a.message };
+    case 'lootResolved': {
+      if (!h) return s;
+      if (h.role === 'thief') {
+        if (h.phase === 'caught') return s;
+        return reduce(a.status === 'cancelled' ? s : { ...s, heist: { ...h, phase: 'won' } }, a.status === 'cancelled' ? { type: 'victimFoundMe', now: a.now } : { type: 'claim' });
+      }
+      if (a.status === 'cancelled') return reduce(s, { type: 'caughtHandshake' });
+      return h.phase === 'lost' || h.phase === 'saved' ? s : lost(s, h);
     }
     case 'caughtHandshake': {
-      if (!h || h.role !== 'victim') return s;
+      if (!h || h.role !== 'victim' || h.phase === 'saved') return s;
       const at = Date.now();
       const saved = { ...s, stake: s.stake + h.amount + h.bond, immuneUntil: at + IMMUNITY, heist: { ...h, phase: 'saved' as const, phaseEnds: null } };
       return log(addWin(saved, 'saves'), 'good', `Caught ${h.rival.name}: recovered ${eth(h.amount)} and won their ${eth(h.bond)} bond`, at);
@@ -268,12 +320,11 @@ export function reduce(s: GameState, a: Action): GameState {
       const rival = s.nearby.find((p) => p.uid === s.target);
       if (!rival || h) return s;
       if (a.now < s.readyAt) return { ...s, notice: 'Still on cooldown.' };
-      const amount = rival.vault * a.lootRate;
-      if (amount < MIN_LOOT) return { ...s, notice: 'That vault is too small to loot.' };
+      // The contract picks the amount when the loot starts.
       return {
         ...s,
         view: 'table',
-        heist: { role: 'thief', phase: 'ticket', rival, amount, bond: amount * BOND_RATE, phaseEnds: a.now + TICKET_TIME, deadline: null, pulses: 0, signal: 0, inRange: false },
+        heist: { role: 'thief', phase: 'ticket', rival, amount: 0, bond: 0, phaseEnds: a.now + TICKET_TIME, deadline: null, pulses: 0, signal: 0, inRange: false },
       };
     }
     case 'incoming': {
@@ -318,11 +369,16 @@ export function reduce(s: GameState, a: Action): GameState {
     case 'clearLevelUp':
       return { ...s, levelUpTo: null };
     case 'setBalances':
-      return { ...s, wallet: a.wallet, stake: a.stake };
+      // Max, because the chain only records these once a loot is cancelled or claimed, which can be after this phone's timer started.
+      return { ...s, wallet: a.wallet, stake: a.stake, immuneUntil: Math.max(s.immuneUntil, a.immuneUntil), readyAt: Math.max(s.readyAt, a.readyAt) };
     case 'setUser':
       return { ...s, name: a.name, walletAddress: a.walletAddress, privateKey: a.privateKey };
     case 'addWin':
       return addWin(s, 'thefts');
+    case 'logEvent':
+      return log(s, a.kind, a.text, a.at);
+    case 'clearLog':
+      return { ...s, log: [] };
     case 'tick':
       return advance(s, a.now);
     case 'skip':
