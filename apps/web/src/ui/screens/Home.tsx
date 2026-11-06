@@ -95,7 +95,7 @@ export function TableHome({ s, send, now, onScan, onDepositOnChain, onWithdrawOn
         {immune > 0 && <span className="chip good"><Icon name="shield" small />Immune {fmtTime(immune)}</span>}
         {cooldown > 0 && <span className="chip bad">Cooldown {fmtTime(cooldown)}</span>}
       </div>
-      <Btn tone="red" big block disabled={cooldown > 0} click="radar-ping" onClick={() => (onScan ? onScan() : send({ type: 'scan', now }))}>
+      <Btn tone="red" big block disabled={cooldown > 0} click={null} onClick={() => (onScan ? onScan() : send({ type: 'scan', now }))}>
         {cooldown > 0 ? `Lay low ${fmtTime(cooldown)}` : 'Scan for targets'}
       </Btn>
       <div className="row">
@@ -118,7 +118,7 @@ export function TableHome({ s, send, now, onScan, onDepositOnChain, onWithdrawOn
 }
 
 export function Scan({ s, send, now, onScan, onRobTarget }: Props) {
-  useLoop(s.soundOn && s.scanEnds !== null ? 'sneak-loop' : null, 0.3);
+  // Silent during ultrasound scan to prevent speaker audio from interfering with mic reception
   const scanning = s.scanEnds !== null;
   const done = !scanning;
   const target = s.nearby.find((p) => p.uid === s.target);
@@ -173,7 +173,7 @@ export function Scan({ s, send, now, onScan, onRobTarget }: Props) {
           {target ? (
             <Btn tone="red" big block click="heist-start" onClick={() => (onRobTarget && target ? onRobTarget(target) : send({ type: 'rob', now, lootRate: 0.05 + Math.random() * 0.2 }))}>Rob {target.name.split(' ').slice(0, 2).join(' ')}</Btn>
           ) : (
-            <Btn big block click="radar-ping" onClick={() => (onScan ? onScan() : send({ type: 'scan', now }))}>Scan again</Btn>
+            <Btn big block click={null} onClick={() => (onScan ? onScan() : send({ type: 'scan', now }))}>Scan again</Btn>
           )}
           {target && <p className="small-text muted" style={{ textAlign: 'center' }}>Takes 5% to 25% of their stake. Your bond: 20% of the loot.</p>}
         </div>

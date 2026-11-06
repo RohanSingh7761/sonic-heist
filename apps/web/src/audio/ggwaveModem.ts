@@ -75,13 +75,13 @@ export class GgwaveModem {
   // Play audio payload through speakers
   async transmit(
     payload: Uint8Array,
-    protocolId: number = 1,
-    volume: number = 30
+    protocolId: number = 4,
+    volume: number = 85
   ): Promise<{ durationMs: number }> {
     await this.loadLibrary();
     const ctx = this.ensureAudioContext();
 
-    if (!this.instance) {
+    if (!this.instance && this.ggwave) {
       const parameters = this.ggwave.getDefaultParameters();
       parameters.sampleRateInp = ctx.sampleRate;
       parameters.sampleRateOut = ctx.sampleRate;
@@ -112,10 +112,15 @@ export class GgwaveModem {
     const durationMs = (floatBuffer.length / ctx.sampleRate) * 1000;
 
     return new Promise((resolve) => {
-      source.onended = () => {
+      let resolved = false;
+      const done = () => {
+        if (resolved) return;
+        resolved = true;
         this.isTransmitting = false;
         resolve({ durationMs });
       };
+      source.onended = done;
+      setTimeout(done, durationMs + 200);
       source.start(0);
     });
   }
@@ -128,6 +133,13 @@ export class GgwaveModem {
     if (this.isListening) return;
     await this.loadLibrary();
     const ctx = this.ensureAudioContext();
+
+    if (!this.instance && this.ggwave) {
+      const parameters = this.ggwave.getDefaultParameters();
+      parameters.sampleRateInp = ctx.sampleRate;
+      parameters.sampleRateOut = ctx.sampleRate;
+      this.instance = this.ggwave.init(parameters);
+    }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error('Microphone access requires HTTPS or localhost and a supported browser.');

@@ -155,16 +155,20 @@ export function UiApp() {
   useEffect(() => { send({ type: 'tick', now }); }, [now]);
   useEffect(() => { setSoundOn(s.soundOn); }, [s.soundOn]);
 
-  // Load sounds & resume listening on first user tap
+  // Load sounds & ensure listening and active AudioContext on user interaction
   useEffect(() => {
-    const first = () => {
+    const resumeAudio = () => {
       soundFX.preload();
-      if (sRef.current.micOk) {
+      const ctx = modem.ensureAudioContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      if (sRef.current.micOk && (sRef.current.patrol || sRef.current.heist !== null)) {
         ensureListening().catch(() => {});
       }
     };
-    window.addEventListener('pointerdown', first, { once: true });
-    return () => window.removeEventListener('pointerdown', first);
+    window.addEventListener('pointerdown', resumeAudio);
+    return () => window.removeEventListener('pointerdown', resumeAudio);
   }, []);
 
   const getUid = () => {
@@ -194,17 +198,19 @@ export function UiApp() {
     switch (msg.type) {
       case MessageType.PING: {
         const m = msg as PingMessage;
+        if (m.scannerUid === myUid) return; // Ignore our own broadcast!
+
         const isRunningAsThief = currentS.heist?.role === 'thief' && (currentS.heist.phase === 'headstart' || currentS.heist.phase === 'hunted');
         if (!currentS.patrol && !isRunningAsThief) return;
 
         if (m.targetUid === 0 || m.targetUid === myUid || isRunningAsThief) {
-          sfx('radar-ping');
+          // Respond with PONG over ultrasound (keep speaker quiet from audible sounds to avoid clashing)
           setTimeout(() => {
             const pong = encodePong({
               responderUid: myUid,
               echoNonce: m.nonce,
             });
-            modem.transmit(pong, proto, vol);
+            modem.transmit(pong, proto, 85);
           }, 250);
         }
         break;
@@ -212,7 +218,12 @@ export function UiApp() {
 
       case MessageType.PONG: {
         const m = msg as PongMessage;
-        sfx('radar-ping');
+        if (m.responderUid === myUid) return; // Ignore our own echo!
+
+        // Target found! Play pleasant chime and vibrate
+        sfx('coin');
+        if ('vibrate' in navigator) navigator.vibrate?.([80, 50, 80]);
+
         const pName = getPlayerName(m.responderUid);
         const discovered: Player = {
           uid: m.responderUid,
@@ -345,7 +356,7 @@ export function UiApp() {
       targetUid: 0,
       nonce: Math.floor(Math.random() * 0xffff),
     });
-    modem.transmit(ping, audioProtocol, 75);
+    modem.transmit(ping, audioProtocol, 85);
     send({ type: 'scan', now: Date.now() });
   };
 
@@ -355,7 +366,7 @@ export function UiApp() {
       thiefAddress: myAddr,
       victimUid: target.uid,
     });
-    modem.transmit(req, audioProtocol, 75);
+    modem.transmit(req, audioProtocol, 85);
     send({ type: 'rob', now: Date.now(), lootRate: 0.15 });
   };
 
@@ -366,7 +377,7 @@ export function UiApp() {
       targetUid: s.heist?.rival.uid || 0,
       nonce: Math.floor(Math.random() * 0xffff),
     });
-    await modem.transmit(ping, audioProtocol, 75);
+    await modem.transmit(ping, audioProtocol, 85);
   };
 
   const onCancelHeist = async () => {

@@ -25,7 +25,7 @@ function Sneak({ s, h }: Props) {
   const path = pathToSeat(MY_SEAT, seatIdx);
   const end = path[path.length - 1];
   const moving = h.phase === 'ticket';
-  useLoop(s.soundOn && moving ? 'sneak-loop' : null, 0.55);
+  // Silent during acoustic ticket transmission
   const copy = {
     ticket: ['Sneaking in...', 'Sent the request. Waiting for their phone to sign a ticket.'],
     grab: ['Grabbing the stake!', 'Ticket signed. The loot is locked in escrow on-chain.'],
@@ -197,7 +197,7 @@ function Hunt({ s, send, h, now, onPulseRadar, onCancelHeist }: Props) {
       ) : h.inRange ? (
         <Btn tone="red" big block click="bang" onClick={() => onCancelHeist ? onCancelHeist() : send({ type: 'cancel', now })}>Catch thief! Cancel heist</Btn>
       ) : (
-        <Btn tone="gold" big block disabled={isPulsing} click="radar-ping" onClick={handlePulse}>{isPulsing ? 'Pulsing ultrasound radar...' : 'Pulse radar'}</Btn>
+        <Btn tone="gold" big block disabled={isPulsing} click={null} onClick={handlePulse}>{isPulsing ? 'Pulsing ultrasound radar...' : 'Pulse radar'}</Btn>
 
       )}
     </main>
