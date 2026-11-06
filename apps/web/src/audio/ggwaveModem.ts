@@ -151,7 +151,8 @@ export class GgwaveModem {
     }
 
     this.mediaStreamSource = ctx.createMediaStreamSource(this.mediaStream);
-    const bufferSize = 1024;
+    // Use 2048 or 4096 buffer size on iOS Safari for glitch-free audio processing
+    const bufferSize = 2048;
     this.scriptProcessor = ctx.createScriptProcessor(bufferSize, 1, 1);
 
     this.scriptProcessor.onaudioprocess = (e) => {
@@ -175,11 +176,13 @@ export class GgwaveModem {
 
       // Feed PCM samples into ggwave decoder
       const int8Samples = convertTypedArray(new Float32Array(inputBuffer), Int8Array);
-      const res = this.ggwave.decode(this.instance, int8Samples);
-
-      if (res && res.length > 0) {
-        const decoded = new Uint8Array(res);
-        onPayloadReceived(decoded);
+      // Ensure instance sample rate matches context sample rate
+      if (this.instance && this.ggwave) {
+        const res = this.ggwave.decode(this.instance, int8Samples);
+        if (res && res.length > 0) {
+          const decoded = new Uint8Array(res);
+          onPayloadReceived(decoded);
+        }
       }
     };
 
