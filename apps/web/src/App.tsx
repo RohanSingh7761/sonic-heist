@@ -67,6 +67,7 @@ export default function App() {
   const [isPatrolActive, setIsPatrolActive] = useState(false);
   const [isShielded, setIsShielded] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);
 
   // Vault balances
   const [vaultEth, setVaultEth] = useState(1.5);
@@ -104,9 +105,36 @@ export default function App() {
   } | null>(null);
 
   // Protocol & Audio Settings
-  const [audioProtocol, setAudioProtocol] = useState<number>(4); // Default: Ultrasound Fast (16.2 kHz)
-  const [volume, setVolume] = useState<number>(35);
+  const [audioProtocol, setAudioProtocol] = useState<number>(1); // Default: Audible Fast (3.6 kHz, guaranteed reliable)
+  const [volume, setVolume] = useState<number>(75);
   const [logs, setLogs] = useState<GameLogEntry[]>([]);
+
+  // Persistent live refs to eliminate React stale closure bugs inside Web Audio callbacks & timers
+  const isPatrolActiveRef = useRef(isPatrolActive);
+  const isShieldedRef = useRef(isShielded);
+  const burnerRef = useRef(burner);
+  const vaultEthRef = useRef(vaultEth);
+  const audioProtocolRef = useRef(audioProtocol);
+  const volumeRef = useRef(volume);
+  const immunitySecondsRef = useRef(immunitySeconds);
+  const activeHeistAsVictimRef = useRef(activeHeistAsVictim);
+  const activeHeistAsThiefRef = useRef(activeHeistAsThief);
+  const selectedTargetRef = useRef(selectedTarget);
+  const nearbyPlayersRef = useRef(nearbyPlayers);
+
+  useEffect(() => {
+    isPatrolActiveRef.current = isPatrolActive;
+    isShieldedRef.current = isShielded;
+    burnerRef.current = burner;
+    vaultEthRef.current = vaultEth;
+    audioProtocolRef.current = audioProtocol;
+    volumeRef.current = volume;
+    immunitySecondsRef.current = immunitySeconds;
+    activeHeistAsVictimRef.current = activeHeistAsVictim;
+    activeHeistAsThiefRef.current = activeHeistAsThief;
+    selectedTargetRef.current = selectedTarget;
+    nearbyPlayersRef.current = nearbyPlayers;
+  });
 
   const addLog = (text: string, type: GameLogEntry['type'] = 'info') => {
     const time = new Date().toLocaleTimeString();
@@ -137,7 +165,7 @@ export default function App() {
   // Load ggwave library on mount
   useEffect(() => {
     modem.loadLibrary().then(() => {
-      addLog(`Sonic Heist acoustic engine ready (Protocol: 16.2 kHz Ultrasound).`, 'info');
+      addLog(`Sonic Heist acoustic engine ready (Audible 3.6 kHz & Ultrasound 16.2 kHz enabled).`, 'info');
     }).catch((err) => {
       addLog(`Audio init failed: ${err.message}`, 'warn');
     });
@@ -149,25 +177,54 @@ export default function App() {
 
   // Handle Incoming Decoded Sound Messages (The Dumb Pipe Handler)
   const handleIncomingAudio = (bytes: Uint8Array) => {
+    addLog(`🔊 Audio frame detected (${bytes.length} bytes)`, 'info');
+
+    // Test tone detection
+    if (bytes.length === 5 && bytes[0] === 0x53 && bytes[1] === 0x4f && bytes[2] === 0x4e) {
+      soundFX.playRadarPing();
+      addLog('🎉 Acoustic test tone received & decoded successfully!', 'success');
+      return;
+    }
+
     const msg = decodeHeistMessage(bytes);
-    if (!msg) return;
+    if (!msg) {
+      addLog(`Unrecognized audio packet format (${bytes.length} bytes).`, 'warn');
+      return;
+    }
+
+    const currentBurner = burnerRef.current;
+    const isPatrol = isPatrolActiveRef.current;
+    const isShield = isShieldedRef.current;
+    const proto = audioProtocolRef.current;
+    const vol = volumeRef.current;
 
     switch (msg.type) {
       // 1. PING received
       case MessageType.PING: {
         const m = msg as PingMessage;
-        if (!isPatrolActive || isShielded) return;
-        // Check if targeted ping or broadcast
-        if (m.targetUid === 0 || m.targetUid === burner.uid) {
-          addLog(`Heard PING from 0x${m.scannerUid.toString(16)}. Answering with PONG...`, 'info');
-          // Reply with PONG after brief random slot
+        if (!isPatrol) {
+          addLog(`Ignored PING: Patrol mode is OFF on this device.`, 'warn');
+          return;
+        }
+        if (isShield) {
+          addLog(`Ignored PING: Phone is currently SHIELDED.`, 'warn');
+          return;
+        }
+
+        // Check if targeted ping or broadcast (targetUid === 0 means broadcast to all)
+        if (m.targetUid === 0 || m.targetUid === currentBurner.uid) {
+          addLog(`📡 Heard PING from 0x${m.scannerUid.toString(16)}. Answering with PONG...`, 'loot');
+          soundFX.playRadarPing();
+
+          // Reply with PONG after brief delay
           setTimeout(() => {
             const pong = encodePong({
-              responderUid: burner.uid,
+              responderUid: currentBurner.uid,
               echoNonce: m.nonce,
             });
-            modem.transmit(pong, audioProtocol, volume);
-          }, Math.floor(Math.random() * 800) + 100);
+            modem.transmit(pong, proto, vol);
+            addLog(`Sent PONG reply (UID: 0x${currentBurner.uid.toString(16)}).`, 'info');
+          }, 350);
         }
         break;
       }
@@ -177,19 +234,20 @@ export default function App() {
         const m = msg as PongMessage;
         soundFX.playRadarPing();
         const pName = getPlayerName(m.responderUid);
-        addLog(`Discovered nearby player: "${pName}" (UID: 0x${m.responderUid.toString(16)})`, 'success');
+        addLog(`🎯 Discovered nearby player: "${pName}" (UID: 0x${m.responderUid.toString(16)})`, 'success');
 
         setNearbyPlayers((prev) => {
           const exists = prev.find((p) => p.uid === m.responderUid);
           const sig = Math.random() * 0.4 + 0.5; // Estimated proximity level
-          if (exists) {
-            return prev.map((p) => (p.uid === m.responderUid ? { ...p, signalLevel: sig, lastSeen: Date.now() } : p));
-          }
-          return [...prev, { uid: m.responderUid, name: pName, signalLevel: sig, lastSeen: Date.now() }];
+          const next = exists
+            ? prev.map((p) => (p.uid === m.responderUid ? { ...p, signalLevel: sig, lastSeen: Date.now() } : p))
+            : [...prev, { uid: m.responderUid, name: pName, signalLevel: sig, lastSeen: Date.now() }];
+          nearbyPlayersRef.current = next;
+          return next;
         });
 
         // If currently hunting this thief, update victim closeness!
-        if (activeHeistAsVictim && activeHeistAsVictim.thiefUid === m.responderUid) {
+        if (activeHeistAsVictimRef.current && activeHeistAsVictimRef.current.thiefUid === m.responderUid) {
           setActiveHeistAsVictim((prev) => prev ? ({ ...prev, isThiefInRange: true, thiefSignalLevel: 0.85 }) : null);
         }
         break;
@@ -198,9 +256,16 @@ export default function App() {
       // 3. LOOT_REQ received (Victim targeted)
       case MessageType.LOOT_REQ: {
         const m = msg as LootReqMessage;
-        if (!isPatrolActive || isShielded) return;
-        if (m.victimUid !== burner.uid) return;
-        if (immunitySeconds > 0) {
+        if (!isPatrol) {
+          addLog(`Ignored LOOT_REQ: Patrol is OFF.`, 'warn');
+          return;
+        }
+        if (isShield) {
+          addLog(`Ignored LOOT_REQ: Shielded.`, 'warn');
+          return;
+        }
+        if (m.victimUid !== currentBurner.uid) return;
+        if (immunitySecondsRef.current > 0) {
           addLog(`Rejected LOOT_REQ: currently immune.`, 'warn');
           return;
         }
@@ -220,10 +285,10 @@ export default function App() {
         });
 
         // Transmit ticket back over ultrasound
-        modem.transmit(ticketBytes, audioProtocol, volume);
+        modem.transmit(ticketBytes, proto, vol);
 
         // Schedule victim notification for 10 seconds later (end of head start)
-        const lootAmountEst = vaultEth * 0.15;
+        const lootAmountEst = vaultEthRef.current * 0.15;
         const bondEst = lootAmountEst * 0.2;
         const now = Math.floor(Date.now() / 1000);
 
@@ -249,18 +314,18 @@ export default function App() {
       // 4. TICKET received (Thief side)
       case MessageType.TICKET: {
         const m = msg as TicketMessage;
-        if (m.thiefUid !== burner.uid) return;
-        addLog(`Received valid consent ticket from victim! Submitting startLoot on-chain...`, 'loot');
+        if (m.thiefUid !== currentBurner.uid) return;
+        addLog(`Received valid consent ticket from victim! Escrowing loot & starting 10s head start...`, 'loot');
 
         // Enter Thief Run mode
-        const loot = vaultEth * 0.18;
+        const loot = vaultEthRef.current * 0.18;
         const bond = loot * 0.2;
         const now = Math.floor(Date.now() / 1000);
 
         setActiveHeistAsThief({
           lootId: Math.floor(Math.random() * 900) + 100,
-          victimName: selectedTarget ? selectedTarget.name : 'Unknown Victim',
-          victimUid: selectedTarget ? selectedTarget.uid : 0,
+          victimName: selectedTargetRef.current ? selectedTargetRef.current.name : 'Unknown Victim',
+          victimUid: selectedTargetRef.current ? selectedTargetRef.current.uid : 0,
           lootAmount: loot,
           bondAmount: bond,
           startedAt: now,
@@ -276,8 +341,8 @@ export default function App() {
       // 5. CATCH received (Thief side caught by hunting victim)
       case MessageType.CATCH: {
         const m = msg as CatchMessage;
-        if (!activeHeistAsThief) return;
-        addLog(`Victim physically reached ultrasound range and sent CATCH! Auto-signing CAUGHT...`, 'alert');
+        if (!activeHeistAsThiefRef.current) return;
+        addLog(`Victim physically reached range and sent CATCH! Auto-signing CAUGHT...`, 'alert');
         soundFX.playAlarm();
 
         // Echo CAUGHT signature over ultrasound
@@ -287,18 +352,18 @@ export default function App() {
           signature: new Uint8Array(64).fill(0x77),
         });
 
-        modem.transmit(caughtBytes, audioProtocol, volume);
+        modem.transmit(caughtBytes, proto, vol);
         setActiveHeistAsThief((prev) => prev ? ({ ...prev, isCaught: true }) : null);
         break;
       }
 
       // 6. CAUGHT received (Victim side)
       case MessageType.CAUGHT: {
-        if (!activeHeistAsVictim) return;
+        if (!activeHeistAsVictimRef.current) return;
         soundFX.playCatchLock();
         addLog(`Thief CAUGHT handshake verified! Recovering loot + winning bond!`, 'success');
 
-        const reward = activeHeistAsVictim.lootAmount + activeHeistAsVictim.bondAmount;
+        const reward = activeHeistAsVictimRef.current.lootAmount + activeHeistAsVictimRef.current.bondAmount;
         setVaultEth((prev) => prev + reward);
         setImmunitySeconds(300); // 5 min immunity
         setActiveHeistAsVictim(null);
@@ -309,15 +374,20 @@ export default function App() {
 
   // Toggle Continuous Patrol Service
   const togglePatrol = async () => {
-    if (isPatrolActive) {
+    if (isPatrolActiveRef.current) {
       modem.stopListening();
       setIsPatrolActive(false);
+      isPatrolActiveRef.current = false;
       addLog('Patrol deactivated. Microphone listening off.', 'info');
     } else {
       try {
-        await modem.startListening((bytes) => handleIncomingAudio(bytes));
+        await modem.startListening(
+          (bytes) => handleIncomingAudio(bytes),
+          (lvl) => setMicLevel(lvl)
+        );
         setIsPatrolActive(true);
-        addLog('Patrol active. Listening for ultrasound pings (16.2 kHz)...', 'success');
+        isPatrolActiveRef.current = true;
+        addLog(`Patrol active. Microphone listening for acoustic pings...`, 'success');
       } catch (err: any) {
         addLog(`Microphone error: ${err.message}`, 'warn');
       }
@@ -329,30 +399,49 @@ export default function App() {
     if (isScanning) return;
     setIsScanning(true);
     setSelectedTarget(null);
-    addLog('Emitting ultrasound PING (broadcast)...', 'info');
+    addLog('Emitting acoustic PING (broadcast)...', 'info');
 
-    // Ensure audio context is started
-    if (!isPatrolActive) {
+    // Ensure audio context & microphone are active
+    if (!isPatrolActiveRef.current) {
       await togglePatrol();
     }
 
+    const currentBurner = burnerRef.current;
+    const proto = audioProtocolRef.current;
+    const vol = volumeRef.current;
+
     const ping = encodePing({
-      scannerUid: burner.uid,
+      scannerUid: currentBurner.uid,
       nonce: Math.floor(Math.random() * 0xffff),
       targetUid: 0, // Everyone
     });
 
     try {
-      await modem.transmit(ping, audioProtocol, volume);
-      addLog('Ping sent. Listening for nearby player replies...', 'info');
+      await modem.transmit(ping, proto, vol);
+      addLog('Ping broadcast transmitted. Listening for player replies...', 'info');
     } catch (err: any) {
       addLog(`Scan transmit error: ${err.message}`, 'warn');
     }
 
     setTimeout(() => {
       setIsScanning(false);
-      addLog(`Scan complete. ${nearbyPlayers.length} agents in range.`, 'info');
-    }, 5000);
+      const count = nearbyPlayersRef.current.length;
+      addLog(`Scan complete. ${count} agents in range.`, count > 0 ? 'success' : 'info');
+    }, 4500);
+  };
+
+  // Send Test Chirp / Ping
+  const handleTestChirp = async () => {
+    const proto = audioProtocolRef.current;
+    const vol = volumeRef.current;
+    addLog(`Transmitting acoustic test signal (${proto === 1 ? '3.6 kHz Audible' : '16.2 kHz Ultrasound'})...`, 'info');
+    try {
+      const testPayload = new Uint8Array([0x53, 0x4f, 0x4e, 0x49, 0x43]); // 'SONIC'
+      await modem.transmit(testPayload, proto, vol);
+      addLog('Test signal sent. Look for confirmation on nearby patrol devices.', 'success');
+    } catch (err: any) {
+      addLog(`Test signal error: ${err.message}`, 'warn');
+    }
   };
 
   // Initiate Heist against selected target
@@ -515,6 +604,7 @@ export default function App() {
               isShielded={isShielded}
               immunitySeconds={immunitySeconds}
               cooldownSeconds={cooldownSeconds}
+              micLevel={micLevel}
               onTogglePatrol={togglePatrol}
               onToggleShield={() => {
                 setIsShielded(!isShielded);
@@ -576,25 +666,41 @@ export default function App() {
           </div>
         )}
 
-        {/* Acoustic Protocol Selector */}
-        <div className="mt-5 p-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex items-center justify-between text-xs font-mono">
-          <span className="text-slate-400 flex items-center gap-1.5">
-            <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-            Frequency Band:
-          </span>
-          <select
-            value={audioProtocol}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              setAudioProtocol(val);
-              addLog(`Switched protocol to ID ${val}`, 'info');
-            }}
-            className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[11px] text-emerald-300 focus:outline-none"
-          >
-            <option value={4}>Ultrasound Fast (16.2 kHz, Inaudible)</option>
-            <option value={5}>Ultrasound Fastest (17.5 kHz)</option>
-            <option value={1}>Audible Fast (3.6 kHz, Debug)</option>
-          </select>
+        {/* Acoustic Protocol Selector & Acoustic Test Signal */}
+        <div className="mt-5 p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 flex flex-col gap-2.5 text-xs font-mono">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 flex items-center gap-1.5">
+              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              Frequency Mode:
+            </span>
+            <select
+              value={audioProtocol}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setAudioProtocol(val);
+                addLog(`Switched frequency mode to ${val === 1 ? '3.6 kHz Audible Fast' : val === 4 ? '16.2 kHz Ultrasound' : '17.5 kHz Ultrasound'}`, 'info');
+              }}
+              className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1 text-[11px] text-emerald-300 focus:outline-none"
+            >
+              <option value={1}>Audible Fast (3.6 kHz, Recommended)</option>
+              <option value={4}>Ultrasound Fast (16.2 kHz, Inaudible)</option>
+              <option value={5}>Ultrasound Fastest (17.5 kHz)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+            <span className="text-[11px] text-slate-500">
+              Transmit Vol: <span className="text-slate-300 font-bold">{volume}%</span>
+            </span>
+            <button
+              onClick={handleTestChirp}
+              className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-emerald-400 border border-slate-700 flex items-center gap-1 transition-all"
+              title="Emit a test chirp over audio to verify that the other phone/laptop microphone hears it"
+            >
+              <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
+              <span>TEST AUDIO CHIRP</span>
+            </button>
+          </div>
         </div>
 
         {/* Surveillance Feed */}

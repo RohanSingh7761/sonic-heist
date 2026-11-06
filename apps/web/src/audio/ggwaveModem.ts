@@ -133,20 +133,32 @@ export class GgwaveModem {
       throw new Error('Microphone access requires HTTPS or localhost and a supported browser.');
     }
 
-    this.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        autoGainControl: false,
-        noiseSuppression: false,
-      },
-      video: false,
-    });
+    try {
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          autoGainControl: false,
+          noiseSuppression: false,
+        },
+        video: false,
+      });
+    } catch {
+      // Fallback for mobile browsers with restrictive constraints
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+    }
 
     this.mediaStreamSource = ctx.createMediaStreamSource(this.mediaStream);
     const bufferSize = 1024;
     this.scriptProcessor = ctx.createScriptProcessor(bufferSize, 1, 1);
 
     this.scriptProcessor.onaudioprocess = (e) => {
+      // Zero out output buffer to prevent audio feedback loop through speaker
+      const outputBuffer = e.outputBuffer.getChannelData(0);
+      outputBuffer.fill(0);
+
       if (this.isTransmitting) return; // Half-duplex guard
 
       const inputBuffer = e.inputBuffer.getChannelData(0);

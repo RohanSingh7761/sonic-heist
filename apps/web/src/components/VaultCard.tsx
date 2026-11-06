@@ -11,6 +11,7 @@ interface VaultCardProps {
   isShielded: boolean;
   immunitySeconds: number;
   cooldownSeconds: number;
+  micLevel?: number;
   onTogglePatrol: () => void;
   onToggleShield: () => void;
   onDeposit: (amount: number) => void;
@@ -27,6 +28,7 @@ export const VaultCard: React.FC<VaultCardProps> = ({
   isShielded,
   immunitySeconds,
   cooldownSeconds,
+  micLevel = 0,
   onTogglePatrol,
   onToggleShield,
   onDeposit,
@@ -136,6 +138,25 @@ export const VaultCard: React.FC<VaultCardProps> = ({
           <Shield className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* Live Acoustic Activity Meter */}
+      {isPatrolActive && (
+        <div className="mt-3 pt-3 border-t border-slate-800/80">
+          <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 mb-1">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              Acoustic Ingestion Live
+            </span>
+            <span>Mic Activity: {Math.round(micLevel * 100)}%</span>
+          </div>
+          <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+            <div
+              className="bg-gradient-to-r from-emerald-500 to-indigo-500 h-full transition-all duration-75"
+              style={{ width: `${Math.min(100, micLevel * 100)}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
