@@ -5,7 +5,18 @@ import { AVATARS, BackBar, Btn, ClosenessMeter, Icon, LEVEL_TITLES, Panel, Sprit
 import { MY_SEAT, TableStage, rivalSeat, type SeatInfo } from '../stages';
 import { CONFIG } from '../../config';
 
-type Props = { s: GameState; send: (a: Action) => void; now: number };
+import type { Player } from '../game';
+
+type Props = {
+  s: GameState;
+  send: (a: Action) => void;
+  now: number;
+  onScan?: () => void;
+  onRobTarget?: (target: Player) => void;
+  audioProtocol?: number;
+  setAudioProtocol?: (p: number) => void;
+  onTestChirp?: () => void;
+};
 
 export function tableSeats(s: GameState, me?: Partial<SeatInfo>, rivalUid?: number, rivalCoins?: number): SeatInfo[] {
   const level = levelFor(s.thefts + s.saves);
@@ -35,7 +46,7 @@ export function Hud({ s }: { s: GameState }) {
   );
 }
 
-export function TableHome({ s, send, now }: Props) {
+export function TableHome({ s, send, now, onScan }: Props) {
   const [stakeOpen, setStakeOpen] = useState(false);
   const immune = s.immuneUntil - now;
   const cooldown = s.readyAt - now;
@@ -49,7 +60,7 @@ export function TableHome({ s, send, now }: Props) {
         {immune > 0 && <span className="chip good"><Icon name="shield" small />Immune {fmtTime(immune)}</span>}
         {cooldown > 0 && <span className="chip bad">Cooldown {fmtTime(cooldown)}</span>}
       </div>
-      <Btn tone="red" big block disabled={cooldown > 0} click="radar-ping" onClick={() => send({ type: 'scan', now })}>
+      <Btn tone="red" big block disabled={cooldown > 0} click="radar-ping" onClick={() => (onScan ? onScan() : send({ type: 'scan', now }))}>
         {cooldown > 0 ? `Lay low ${fmtTime(cooldown)}` : 'Scan for targets'}
       </Btn>
       <div className="row">
@@ -70,7 +81,7 @@ export function TableHome({ s, send, now }: Props) {
   );
 }
 
-export function Scan({ s, send, now }: Props) {
+export function Scan({ s, send, now, onScan, onRobTarget }: Props) {
   useLoop(s.soundOn && s.scanEnds !== null ? 'sneak-loop' : null, 0.3);
   const scanning = s.scanEnds !== null;
   const done = !scanning;
@@ -114,9 +125,9 @@ export function Scan({ s, send, now }: Props) {
       {done && (
         <div className="sticky-action">
           {target ? (
-            <Btn tone="red" big block click="heist-start" onClick={() => send({ type: 'rob', now, lootRate: 0.05 + Math.random() * 0.2 })}>Rob {target.name.split(' ').slice(0, 2).join(' ')}</Btn>
+            <Btn tone="red" big block click="heist-start" onClick={() => (onRobTarget && target ? onRobTarget(target) : send({ type: 'rob', now, lootRate: 0.05 + Math.random() * 0.2 }))}>Rob {target.name.split(' ').slice(0, 2).join(' ')}</Btn>
           ) : (
-            <Btn big block click="radar-ping" onClick={() => send({ type: 'scan', now })}>Scan again</Btn>
+            <Btn big block click="radar-ping" onClick={() => (onScan ? onScan() : send({ type: 'scan', now }))}>Scan again</Btn>
           )}
           {target && <p className="small-text muted" style={{ textAlign: 'center' }}>Takes 5% to 25% of their stake. Your bond: 20% of the loot.</p>}
         </div>
@@ -174,7 +185,7 @@ export function Log({ s }: Props) {
   );
 }
 
-export function Settings({ s, send }: Props) {
+export function Settings({ s, send, audioProtocol = 1, setAudioProtocol, onTestChirp }: Props) {
   const Setting = ({ label, hint, k }: { label: string; hint: string; k: 'soundOn' | 'shield' | 'patrol' }) => (
     <Panel>
       <div className="spread">
@@ -189,6 +200,30 @@ export function Settings({ s, send }: Props) {
       <Setting label="Game sounds" hint="Coins, sirens and music" k="soundOn" />
       <Setting label="Patrol" hint="Listen for game signals nearby" k="patrol" />
       <Setting label="Shield" hint="Stop answering pings, for private spaces" k="shield" />
+      <Panel>
+        <div className="spread">
+          <div>
+            <b>Acoustic Band</b>
+            <div className="small-text muted">{audioProtocol === 1 ? '3.6 kHz Audible Fast (Recommended)' : audioProtocol === 4 ? '16.2 kHz Ultrasound Fast (Inaudible)' : '17.5 kHz Ultrasound Fastest'}</div>
+          </div>
+          {setAudioProtocol && (
+            <select
+              value={audioProtocol}
+              onChange={(e) => setAudioProtocol(Number(e.target.value))}
+              style={{ background: '#20162b', color: 'var(--gold)', border: '1px solid var(--gold)', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontFamily: 'inherit' }}
+            >
+              <option value={1}>3.6 kHz Audible</option>
+              <option value={4}>16.2 kHz Ultrasound</option>
+              <option value={5}>17.5 kHz Ultrasound</option>
+            </select>
+          )}
+        </div>
+        {onTestChirp && (
+          <div style={{ marginTop: 8 }}>
+            <Btn small block onClick={onTestChirp}>Test Audio Chirp</Btn>
+          </div>
+        )}
+      </Panel>
       <Panel>
         <b>Privacy</b>
         <p className="small-text muted">Your mic only decodes game signals. Nothing is recorded, stored or uploaded.</p>

@@ -74,7 +74,7 @@ export const TICKET_TIME = 3_500;
 export const GRAB_TIME = 1_800;
 export const DISGUISE_TIME = 1_600;
 export const HANDSHAKE_TIME = 4_000;
-export const PULSES_TO_FIND = 3; // mock stand-in for walking into range of the real thief
+export const PULSES_TO_FIND = 1; // Immediate detection upon acoustic radar pulse
 
 // shortcut: placeholder thresholds, set the real numbers once the team decides them.
 export const LEVEL_AT: Record<Level, number> = { 1: 0, 2: 3, 3: 8 };
@@ -123,6 +123,10 @@ export type Action =
   | { type: 'withdraw'; amount: number }
   | { type: 'scan'; now: number }
   | { type: 'target'; uid: number }
+  | { type: 'discoveredPlayer'; player: Player }
+  | { type: 'ticketReceived' }
+  | { type: 'thiefInRange'; signal: number }
+  | { type: 'caughtHandshake' }
   | { type: 'rob'; now: number; lootRate: number }
   | { type: 'incoming'; now: number; rival: Player; lootRate: number }
   | { type: 'hunt' }
@@ -194,7 +198,8 @@ function lost(s: GameState, h: Heist): GameState {
 function advance(s: GameState, now: number): GameState {
   let next = s;
   if (next.scanEnds !== null && now >= next.scanEnds) {
-    next = { ...next, scanEnds: null, nearby: MOCK_PLAYERS };
+    const players = next.nearby.length > 0 ? next.nearby : MOCK_PLAYERS;
+    next = { ...next, scanEnds: null, nearby: players };
   }
   for (let i = 0; i < 8; i++) {
     const h = next.heist;
@@ -227,6 +232,25 @@ export function reduce(s: GameState, a: Action): GameState {
       return log({ ...s, wallet: s.wallet + a.amount, stake: s.stake - a.amount }, 'info', `Withdrew ${eth(a.amount)}`, 0);
     case 'scan':
       return { ...s, view: 'scan', scanEnds: a.now + SCAN_TIME, nearby: [], target: null };
+    case 'discoveredPlayer': {
+      const exists = s.nearby.find((p) => p.uid === a.player.uid);
+      if (exists) return s;
+      return { ...s, nearby: [...s.nearby, a.player] };
+    }
+    case 'thiefInRange': {
+      if (!h || h.role !== 'victim') return s;
+      return { ...s, heist: { ...h, signal: a.signal, inRange: true } };
+    }
+    case 'ticketReceived': {
+      if (!h || h.role !== 'thief' || h.phase !== 'ticket') return s;
+      return step(s, h, Date.now());
+    }
+    case 'caughtHandshake': {
+      if (!h || h.role !== 'victim') return s;
+      const at = Date.now();
+      const saved = { ...s, stake: s.stake + h.amount + h.bond, immuneUntil: at + IMMUNITY, heist: { ...h, phase: 'saved' as const, phaseEnds: null } };
+      return log(addWin(saved, 'saves'), 'good', `Caught ${h.rival.name}: recovered ${eth(h.amount)} and won their ${eth(h.bond)} bond`, at);
+    }
     case 'target':
       return { ...s, target: a.uid };
     case 'rob': {
@@ -263,7 +287,7 @@ export function reduce(s: GameState, a: Action): GameState {
     case 'pulse': {
       if (h?.phase !== 'hunting') return s;
       const pulses = h.pulses + 1;
-      return { ...s, heist: { ...h, pulses, signal: Math.min(1, pulses / PULSES_TO_FIND), inRange: pulses >= PULSES_TO_FIND } };
+      return { ...s, heist: { ...h, pulses, signal: 1.0, inRange: true } };
     }
     case 'cancel':
       if (h?.phase !== 'hunting' || !h.inRange) return s;

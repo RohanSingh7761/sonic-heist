@@ -63,7 +63,7 @@ export function Pick({ s, send }: Props) {
   );
 }
 
-export function Setup({ s, send }: Props) {
+export function Setup({ s, send, onAllowMic, onSoundCheck }: Props & { onAllowMic?: () => void; onSoundCheck?: () => void }) {
   const [testing, setTesting] = useState(false);
   useEffect(() => {
     if (!testing) return;
@@ -77,12 +77,12 @@ export function Setup({ s, send }: Props) {
       <Panel>
         <div className="spread"><b className="row"><Icon name="mic" /> 1. Microphone</b>{s.micOk && <span className="chip good">Allowed</span>}</div>
         <p className="small-text muted">Listens for game signals only. Nothing is recorded, stored or uploaded.</p>
-        {!s.micOk && <Btn block small onClick={() => send({ type: 'micOk' })}>Allow microphone</Btn>}
+        {!s.micOk && <Btn block small onClick={onAllowMic ? onAllowMic : () => send({ type: 'micOk' })}>Allow microphone</Btn>}
       </Panel>
       <Panel>
         <div className="spread"><b className="row"><Icon name="flame" /> 2. Sound check</b>{s.soundOk && <span className="chip good">Passed</span>}</div>
         <p className="small-text muted">Checks that this phone can send and hear the signal.</p>
-        {!s.soundOk && <Btn block small disabled={testing || !s.micOk} click="radar-ping" onClick={() => setTesting(true)}>{testing ? 'Listening...' : s.micOk ? 'Run check' : 'Allow microphone first'}</Btn>}
+        {!s.soundOk && <Btn block small disabled={testing || !s.micOk} click="radar-ping" onClick={() => { if (onSoundCheck) { setTesting(true); Promise.resolve(onSoundCheck()).finally(() => setTesting(false)); } else { setTesting(true); } }}>{testing ? 'Listening...' : s.micOk ? 'Run check' : 'Allow microphone first'}</Btn>}
       </Panel>
       <Panel>
         <div className="spread"><b className="row"><Icon name="coin" /> 3. Your stake</b>{s.stake > 0 && <span className="chip good">{fmtEth(s.stake)} ETH</span>}</div>

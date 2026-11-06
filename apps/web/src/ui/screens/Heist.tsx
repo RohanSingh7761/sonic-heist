@@ -6,7 +6,14 @@ import { MY_SEAT, RunStage, TableStage, pathToSeat, rivalSeat } from '../stages'
 import { Hud, tableSeats } from './Home';
 import { TICKET_TIME } from '../game';
 
-type Props = { s: GameState; send: (a: Action) => void; now: number; h: HeistState };
+type Props = {
+  s: GameState;
+  send: (a: Action) => void;
+  now: number;
+  h: HeistState;
+  onPulseRadar?: () => void;
+  onCancelHeist?: () => void;
+};
 
 const left = (h: HeistState, now: number) => (h.deadline ?? now) - now;
 
@@ -129,7 +136,7 @@ function Alert({ s, send, h, now }: Props) {
   );
 }
 
-function Hunt({ s, send, h, now }: Props) {
+function Hunt({ s, send, h, now, onPulseRadar, onCancelHeist }: Props) {
   const level = levelFor(s.thefts + s.saves);
   const shaking = h.phase === 'handshake';
   const remaining = left(h, now);
@@ -159,8 +166,8 @@ function Hunt({ s, send, h, now }: Props) {
         <Panel><b>Catching them...</b><p className="small-text muted">Stay close. Exchanging signed messages, then cancelling on-chain.</p><div className="bar red"><div style={{ width: `${100 - (((h.phaseEnds as number) - now) / 4000) * 100}%` }} /></div></Panel>
       ) : (
         <>
-          <Btn big block disabled={h.inRange} click="radar-ping" onClick={() => send({ type: 'pulse' })}>{h.inRange ? 'Thief located' : 'Pulse radar'}</Btn>
-          <Btn tone="red" big block disabled={!h.inRange} click="bang" onClick={() => send({ type: 'cancel', now })}>{h.inRange ? 'Catch them! Cancel heist' : 'Get closer to catch them'}</Btn>
+          <Btn big block disabled={h.inRange} click="radar-ping" onClick={() => onPulseRadar ? onPulseRadar() : send({ type: 'pulse' })}>{h.inRange ? 'Thief located' : 'Pulse radar'}</Btn>
+          <Btn tone="red" big block disabled={!h.inRange} click="bang" onClick={() => onCancelHeist ? onCancelHeist() : send({ type: 'cancel', now })}>{h.inRange ? 'Catch them! Cancel heist' : 'Pulse radar to locate'}</Btn>
         </>
       )}
     </main>
