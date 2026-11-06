@@ -265,8 +265,9 @@ export function Settings({ s, send, audioProtocol = 4, setAudioProtocol, onTestC
           )}
         </div>
         {onTestChirp && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
             <Btn small block onClick={onTestChirp}>Test Audio Chirp</Btn>
+            <Btn small block onClick={() => send({ type: 'go', view: 'setup' })}>Re-test Setup</Btn>
           </div>
         )}
       </Panel>

@@ -155,9 +155,14 @@ export function UiApp() {
   useEffect(() => { send({ type: 'tick', now }); }, [now]);
   useEffect(() => { setSoundOn(s.soundOn); }, [s.soundOn]);
 
-  // Load sounds on first user tap
+  // Load sounds & resume listening on first user tap
   useEffect(() => {
-    const first = () => soundFX.preload();
+    const first = () => {
+      soundFX.preload();
+      if (sRef.current.micOk) {
+        ensureListening().catch(() => {});
+      }
+    };
     window.addEventListener('pointerdown', first, { once: true });
     return () => window.removeEventListener('pointerdown', first);
   }, []);
@@ -318,6 +323,7 @@ export function UiApp() {
   const onAllowMic = async () => {
     try {
       await ensureListening();
+      localStorage.setItem('sonic_mic_ok', 'true');
       send({ type: 'micOk' });
       sfx('coin');
     } catch (err: any) {
@@ -328,6 +334,7 @@ export function UiApp() {
   const onSoundCheck = async () => {
     const testBytes = new Uint8Array([0x53, 0x4f, 0x4e, 0x49, 0x43]); // "SONIC"
     await modem.transmit(testBytes, audioProtocol, 75);
+    localStorage.setItem('sonic_sound_ok', 'true');
     send({ type: 'soundOk' });
     sfx('coin');
   };

@@ -11,7 +11,7 @@ const TITLE_RUNNERS: Runner[] = [
   { avatar: 'nib', level: 2, state: 'run', x: -48, y: 60, label: 'Nib chasing' },
 ];
 
-export function Title({ send }: Props) {
+export function Title({ s, send }: Props) {
   return (
     <main className="screen center mood-night" style={{ padding: 0 }}>
       <div className="grow" />
@@ -21,7 +21,7 @@ export function Title({ send }: Props) {
       <div style={{ width: '100%' }}><RunStage runners={TITLE_RUNNERS} /></div>
       <div className="grow" />
       <div style={{ width: '100%', padding: '0 16px 16px' }}>
-        <Btn tone="gold" big block onClick={() => send({ type: 'go', view: 'pick' })}>Start</Btn>
+        <Btn tone="gold" big block onClick={() => send({ type: 'go', view: (s.micOk && s.soundOk) ? 'table' : 'setup' })}>Start</Btn>
         <p className="muted small-text" style={{ marginTop: 6 }}>Real Base Sepolia smart contracts & acoustic proximity.</p>
       </div>
     </main>
@@ -123,7 +123,7 @@ export function Setup({
         big
         block
         disabled={!ready}
-        onClick={() => send({ type: 'go', view: 'round' })}
+        onClick={() => send({ type: 'go', view: 'table' })}
       >
         {ready ? 'Proceed to Table' : 'Finish sound check to proceed'}
       </Btn>

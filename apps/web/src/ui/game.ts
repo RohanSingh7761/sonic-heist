@@ -89,31 +89,36 @@ export const MOCK_PLAYERS: Player[] = [
   { uid: 0xb3d9, name: 'Sly Newt B3D9', avatar: 'juno', level: 2, signal: 0.15, vault: 0.2 },
 ];
 
-export const initialState = (name: string): GameState => ({
-  view: 'title',
-  avatar: 'rocco',
-  name,
-  stake: 0,
-  wallet: 0.3,
-  thefts: 0,
-  saves: 0,
-  micOk: false,
-  soundOk: false,
-  soundOn: true,
-  patrol: true,
-  shield: false,
-  roundActive: true,
-  immuneUntil: 0,
-  readyAt: 0,
-  scanEnds: null,
-  nearby: [],
-  target: null,
-  heist: null,
-  levelUpTo: null,
-  notice: null,
-  log: [],
-  logSeq: 0,
-});
+export const initialState = (name: string): GameState => {
+  const micOk = typeof window !== 'undefined' && localStorage.getItem('sonic_mic_ok') === 'true';
+  const soundOk = typeof window !== 'undefined' && localStorage.getItem('sonic_sound_ok') === 'true';
+  const ready = micOk && soundOk;
+  return {
+    view: ready ? 'table' : 'setup',
+    avatar: 'rocco',
+    name,
+    stake: 0,
+    wallet: 0.3,
+    thefts: 0,
+    saves: 0,
+    micOk,
+    soundOk,
+    soundOn: true,
+    patrol: true,
+    shield: false,
+    roundActive: true,
+    immuneUntil: 0,
+    readyAt: 0,
+    scanEnds: null,
+    nearby: [],
+    target: null,
+    heist: null,
+    levelUpTo: null,
+    notice: null,
+    log: [],
+    logSeq: 0,
+  };
+};
 
 export type Action =
   | { type: 'go'; view: View }
@@ -221,8 +226,10 @@ export function reduce(s: GameState, a: Action): GameState {
     case 'pickAvatar':
       return { ...s, avatar: a.avatar };
     case 'micOk':
+      if (typeof window !== 'undefined') localStorage.setItem('sonic_mic_ok', 'true');
       return { ...s, micOk: true };
     case 'soundOk':
+      if (typeof window !== 'undefined') localStorage.setItem('sonic_sound_ok', 'true');
       return { ...s, soundOk: true };
     case 'toggle':
       return { ...s, [a.key]: !s[a.key] };
