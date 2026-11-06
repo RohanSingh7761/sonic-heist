@@ -1,0 +1,34 @@
+{
+  "ping": {
+    "scannerUid": 2882400001,
+    "nonce": 42069,
+    "targetUid": 0,
+    "expectedHex": "0x11abcdef01a45500000000",
+    "expectedLength": 11
+  },
+  "pong": {
+    "responderUid": 305419896,
+    "echoNonce": 42069,
+    "expectedHex": "0x1212345678a455",
+    "expectedLength": 7
+  },
+  "lootReq": {
+    "thiefAddress": "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc",
+    "victimUid": 305419896,
+    "expectedLength": 25
+  },
+  "ticket": {
+    "thiefUid": 2882400001,
+    "nonce": "1001",
+    "validBefore": 1799999999,
+    "expectedLength": 81
+  },
+  "catch": {
+    "lootId": 1,
+    "expectedLength": 77
+  },
+  "caught": {
+    "lootId": 1,
+    "expectedLength": 77
+  }
+}
