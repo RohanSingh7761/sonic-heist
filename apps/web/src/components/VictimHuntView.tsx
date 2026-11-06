@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { AlertOctagon, Target, Zap, ShieldCheck, Skull, Clock, Radio } from 'lucide-react';
+import { AlertOctagon, Target, Zap, Trophy, Radio, XCircle } from 'lucide-react';
 import { soundFX } from '../game/soundFX';
 
 interface VictimHuntViewProps {
@@ -47,8 +47,10 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
     soundFX.playAlarm();
   }, []);
 
-  // Stable countdown timer: ONLY restarts if the deadline changes, NEVER when parent re-renders
+  // Stable countdown timer: FREEZES when thief is in range / caught
   useEffect(() => {
+    if (isThiefInRange) return; // Stop timer immediately when suspect is in range!
+
     const tick = () => {
       const now = Math.floor(Date.now() / 1000);
       const remaining = Math.max(0, deadline - now);
@@ -62,18 +64,7 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [deadline]);
-
-  // Closeness bar text & segments
-  const getClosenessState = (lvl: number) => {
-    if (!isThiefInRange) return { text: 'OUT OF RANGE (>3m)', bars: 0, color: 'text-slate-500' };
-    if (lvl > 0.75) return { text: 'VERY CLOSE (<0.5m) - LOCKED ON', bars: 4, color: 'text-emerald-400' };
-    if (lvl > 0.5) return { text: 'CLOSE (~1.0m)', bars: 3, color: 'text-emerald-400' };
-    if (lvl > 0.25) return { text: 'NEAR (~2.0m)', bars: 2, color: 'text-amber-400' };
-    return { text: 'FAR (~3.0m)', bars: 1, color: 'text-rose-400' };
-  };
-
-  const closeness = getClosenessState(thiefSignalLevel);
+  }, [deadline, isThiefInRange]);
 
   return (
     <div className="rounded-2xl bg-gradient-to-b from-rose-950/60 via-slate-950 to-slate-950 border-2 border-rose-500/60 p-6 backdrop-blur shadow-[0_0_35px_rgba(244,63,94,0.25)] relative overflow-hidden animate-pulse-border">
@@ -91,13 +82,17 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
       {/* 60s Countdown Timer */}
       <div className="text-center py-2 mb-4">
         <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
-          Hunt Window Closes In
+          {isThiefInRange ? '🚨 HUNT FROZEN — THIEF CAUGHT!' : 'Hunt Window Closes In'}
         </span>
-        <div className="text-6xl font-black font-mono text-rose-400 tracking-tight drop-shadow-[0_0_24px_rgba(244,63,94,0.6)]">
+        <div className={`text-6xl font-black font-mono tracking-tight drop-shadow-[0_0_24px_rgba(244,63,94,0.6)] ${
+          isThiefInRange ? 'text-emerald-400 animate-pulse' : 'text-rose-400'
+        }`}>
           00:{secondsLeft.toString().padStart(2, '0')}
         </div>
         <p className="text-xs text-rose-200/90 font-mono mt-1">
-          Get physically close to the thief and pulse radar to lock on!
+          {isThiefInRange
+            ? '🎯 Suspect intercepted! Tap below to cancel transaction.'
+            : 'Tap "PULSE RADAR" to scan for the thief!'}
         </p>
       </div>
 
@@ -122,7 +117,7 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
         <button
           onClick={onPingThief}
           disabled={isPinging || isCancelling}
-          className={`w-full py-3 px-4 rounded-xl font-mono text-xs font-bold border flex items-center justify-center gap-2 transition-all ${
+          className={`w-full py-3.5 px-4 rounded-xl font-mono text-xs font-bold border flex items-center justify-center gap-2 transition-all ${
             isPinging
               ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50 cursor-wait animate-pulse'
               : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-600/30'
@@ -133,36 +128,7 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
         </button>
       </div>
 
-      {/* Closeness Radar Meter */}
-      <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 mb-5">
-        <div className="flex justify-between items-center text-xs font-mono mb-2">
-          <span className="text-slate-400 flex items-center gap-1.5">
-            <Target className="w-3.5 h-3.5 text-rose-400" />
-            Ultrasound Proximity Radar
-          </span>
-          <span className={`font-bold ${closeness.color}`}>{closeness.text}</span>
-        </div>
-
-        {/* 4 Segment Audio Signal Bar */}
-        <div className="grid grid-cols-4 gap-1.5 h-3">
-          {[1, 2, 3, 4].map((bar) => (
-            <div
-              key={bar}
-              className={`rounded-sm transition-all duration-300 ${
-                bar <= closeness.bars
-                  ? bar >= 3
-                    ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
-                    : bar === 2
-                    ? 'bg-amber-400'
-                    : 'bg-rose-500'
-                  : 'bg-slate-800/80'
-              }`}
-            ></div>
-          ))}
-        </div>
-      </div>
-
-      {/* Action Button: CANCEL HEIST & RECOVER FUNDS */}
+      {/* Direct Cancellation / Status Button */}
       <button
         onClick={onCancelHeist}
         disabled={!isThiefInRange || isCancelling}
@@ -180,14 +146,52 @@ export const VictimHuntView: React.FC<VictimHuntViewProps> = ({
             ? 'EXECUTING ULTRASOUND HANDSHAKE...'
             : isThiefInRange
             ? 'CANCEL HEIST & CLAIM THIEF BOND!'
-            : 'PULSE RADAR WITHIN 2 METERS TO UNLOCK'}
+            : 'PULSE RADAR TO DETECT THIEF'}
         </span>
       </button>
 
-      {isThiefInRange && !isCancelling && (
-        <p className="text-[11px] text-emerald-400 font-mono text-center mt-2.5 font-bold animate-pulse">
-          🎯 THIEF IN RANGE! TAP CANCEL TO RECOVER LOOT + WIN BOND!
-        </p>
+      {/* Big "THIEF CAUGHT!" Modal Popup */}
+      {isThiefInRange && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-emerald-500 rounded-3xl p-6 max-w-sm w-full text-center shadow-[0_0_50px_rgba(16,185,129,0.4)] relative">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center mx-auto mb-4 animate-bounce">
+              <Trophy className="w-8 h-8 text-emerald-400" />
+            </div>
+
+            <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+              Target Intercepted!
+            </span>
+
+            <h3 className="text-xl font-black text-white mt-2">THIEF CAUGHT IN RANGE!</h3>
+            <p className="text-xs text-slate-300 font-mono mt-1">
+              You detected <span className="text-emerald-400 font-bold">{thiefName}</span>! Intercept successful.
+            </p>
+
+            <div className="my-4 p-3 bg-slate-950 rounded-xl border border-slate-800 text-left font-mono text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Recover Stolen Loot:</span>
+                <span className="text-emerald-400 font-bold">+{lootAmount.toFixed(4)} ETH</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Claim Thief Bounty:</span>
+                <span className="text-amber-400 font-bold">+{bondAmount.toFixed(4)} ETH</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-800/80 pt-1 text-[11px]">
+                <span className="text-slate-400">Hunt Timer Status:</span>
+                <span className="text-emerald-300 font-bold">FROZEN</span>
+              </div>
+            </div>
+
+            <button
+              onClick={onCancelHeist}
+              disabled={isCancelling}
+              className="w-full py-4 px-4 rounded-xl font-mono text-xs font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/40 transition-all flex items-center justify-center gap-2"
+            >
+              <Zap className="w-4 h-4 fill-slate-950" />
+              <span>{isCancelling ? 'CANCELLING ON-CHAIN...' : 'CANCEL TRANSACTION & RECOVER FUNDS'}</span>
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

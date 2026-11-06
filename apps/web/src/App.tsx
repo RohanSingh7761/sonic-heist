@@ -49,16 +49,15 @@ import { CONFIG } from './config';
 // Simple deterministic burner account generation for demo
 function getOrCreateBurner() {
   let addr = localStorage.getItem('sonic_heist_addr');
-  let uid = localStorage.getItem('sonic_heist_uid');
-  if (!addr || !uid) {
+  if (!addr) {
     const randomHex = Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
     addr = `0x${randomHex}`;
-    const cleanUid = Math.floor(Math.random() * 0xffffffff) >>> 0;
     localStorage.setItem('sonic_heist_addr', addr);
-    localStorage.setItem('sonic_heist_uid', cleanUid.toString());
-    uid = cleanUid.toString();
   }
-  return { address: addr as `0x${string}`, uid: parseInt(uid) };
+  // Derive UID directly from first 8 hex characters of address so address and UID always match
+  const cleanUid = parseInt(addr.slice(2, 10), 16) >>> 0;
+  localStorage.setItem('sonic_heist_uid', cleanUid.toString());
+  return { address: addr as `0x${string}`, uid: cleanUid };
 }
 
 export default function App() {
@@ -248,10 +247,10 @@ export default function App() {
           return next;
         });
 
-        // If currently hunting this thief, update victim closeness!
-        if (activeHeistAsVictimRef.current && activeHeistAsVictimRef.current.thiefUid === m.responderUid) {
+        // If currently hunting, ANY response or PONG confirms the thief is caught in range!
+        if (activeHeistAsVictimRef.current) {
           soundFX.playCatchLock();
-          addLog(`🎯 Thief detected in acoustic range! Proximity locked!`, 'success');
+          addLog(`🎉 THIEF IN RANGE! "${pName}" caught! Cancellation unlocked!`, 'success');
           setActiveHeistAsVictim((prev) => prev ? ({ ...prev, isThiefInRange: true, thiefSignalLevel: 1.0 }) : null);
         }
         break;
@@ -323,8 +322,7 @@ export default function App() {
       // 4. TICKET received (Thief side)
       case MessageType.TICKET: {
         const m = msg as TicketMessage;
-        if (m.thiefUid !== currentBurner.uid) return;
-        addLog(`Received valid consent ticket from victim! Escrowing loot & starting 10s head start...`, 'loot');
+        addLog(`Received valid consent ticket from victim! Entering Thief Run mode...`, 'loot');
 
         // Enter Thief Run mode
         const loot = vaultEthRef.current * 0.18;
@@ -333,7 +331,7 @@ export default function App() {
 
         setActiveHeistAsThief({
           lootId: Math.floor(Math.random() * 900) + 100,
-          victimName: selectedTargetRef.current ? selectedTargetRef.current.name : 'Unknown Victim',
+          victimName: selectedTargetRef.current ? selectedTargetRef.current.name : 'Target Victim',
           victimUid: selectedTargetRef.current ? selectedTargetRef.current.uid : 0,
           lootAmount: loot,
           bondAmount: bond,
