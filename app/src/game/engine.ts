@@ -10,6 +10,7 @@ import {
   LOOT_CLAIMED,
   cancelLootOnChain,
   claimLootOnChain,
+  clearTimerOnChain,
   depositToVault,
   fetchActiveLoots,
   fetchLootStatus,
@@ -143,8 +144,8 @@ export function send(action: Action) {
     if (h?.phase === 'headstart' || h?.phase === 'hunted') Vibration.vibrate(BUZZ_RUN);
   }
 
-  const { micOk, soundOk, avatar, thefts, saves } = state;
-  const progress = JSON.stringify({ micOk, soundOk, avatar, thefts, saves });
+  const { soundOn, micOk, soundOk, avatar, thefts, saves } = state;
+  const progress = JSON.stringify({ soundOn, micOk, soundOk, avatar, thefts, saves });
   if (progress !== savedProgress) {
     savedProgress = progress;
     SonicAudio.setPref(PROGRESS_KEY, progress);
@@ -479,6 +480,18 @@ export async function deposit(amountEth: number) {
   }
 }
 
+export async function clearTimer(timer: 'immunity' | 'cooldown') {
+  if (!privateKey) return;
+  try {
+    await clearTimerOnChain(privateKey, timer);
+    send({ type: 'timerCleared', timer });
+    refreshBalancesSoon();
+  } catch (err) {
+    log(`clear ${timer} failed: ${errorDetail(err)}`);
+    send({ type: 'lootFailed', message: `Could not remove it: ${chainError(err)}` });
+  }
+}
+
 export async function withdraw(amountEth: number) {
   if (!privateKey) return;
   try {
@@ -521,6 +534,7 @@ export async function soundCheck() {
   }
 }
 
+export const saveWinsNow = flushRobs;
 export const batteryUnrestricted = () => SonicAudio.isBatteryUnrestricted();
 export const openBatterySettings = () => SonicAudio.openBatterySettings();
 
@@ -621,6 +635,7 @@ let booted = false;
 export async function boot() {
   if (booted) return;
   booted = true;
+  setSoundOn(state.soundOn && foreground());
 
   setChainLogger((_, text) => log(text));
   SonicAudio.addListener('onMessage', ({ bytes, heardAt }) => onMessage(bytes, heardAt));

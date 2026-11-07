@@ -42,6 +42,32 @@ const LOOP_RATE: Partial<Record<SfxName, number>> = { 'run-loop': 0.65, 'footste
 class SoundFX {
   // One reusable player per one-shot sound; loops get their own player so they can overlap a one-shot.
   private shots = new Map<SfxName, AudioPlayer>();
+  private loops = new Set<AudioPlayer>();
+  private muted = false;
+
+  // Sound off and leaving the app both land here: nothing plays or starts until it is unmuted.
+  setMuted(muted: boolean) {
+    this.muted = muted;
+    if (!muted) return;
+    [...this.loops].forEach((p) => this.endLoop(p));
+    this.shots.forEach((p) => {
+      try {
+        p.pause();
+      } catch {
+        // A sound that can't pause must not break muting the others.
+      }
+    });
+  }
+
+  private endLoop(p: AudioPlayer) {
+    if (!this.loops.delete(p)) return;
+    try {
+      p.pause();
+      p.remove();
+    } catch {
+      // Already released.
+    }
+  }
 
   private shot(name: SfxName) {
     let p = this.shots.get(name);
@@ -60,6 +86,7 @@ class SoundFX {
 
   // Sound problems must never break the game, so failures only warn. Returns a function that stops the sound.
   play(name: SfxName, { loop = false, volume = 0.6 } = {}): () => void {
+    if (this.muted) return () => {};
     try {
       if (loop) {
         const p = createAudioPlayer(FILES[name]);
@@ -67,7 +94,8 @@ class SoundFX {
         p.volume = volume;
         p.play();
         p.setPlaybackRate(LOOP_RATE[name] ?? 1);
-        return () => p.remove();
+        this.loops.add(p);
+        return () => this.endLoop(p);
       }
       const p = this.shot(name);
       p.volume = volume;

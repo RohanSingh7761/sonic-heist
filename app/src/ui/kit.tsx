@@ -61,7 +61,7 @@ export const PlayerSprite = ({ p, state, size }: { p: Player; state: SpriteState
 
 // ---------- sound ----------
 let soundOn = true;
-export const setSoundOn = (on: boolean) => { soundOn = on; };
+export const setSoundOn = (on: boolean) => { soundOn = on; soundFX.setMuted(!on); };
 export const sfx = (name: SfxName, volume = 0.6) => { if (soundOn) soundFX.play(name, { volume }); };
 // Plays while the component using it is mounted, stops on unmount or when muted.
 export function useLoop(name: SfxName | null, volume = 0.5, on = true) {

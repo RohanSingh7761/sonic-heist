@@ -109,6 +109,7 @@ const stubs = {
     export const LOOT_CANCELLED = 2;
     export const LOOT_CLAIMED = 3;
     export const setChainLogger = () => {};
+    export async function clearTimerOnChain(key, timer) { w().contract.calls.push({ fn: 'clear', timer, sender: addr(key) }); }
     const public_ = (l) => ({ lootId: l.lootId, thief: l.thief, victim: l.victim, amount: l.amount, bond: l.bond, revealAt: l.revealAt, deadline: l.deadline });
     export async function startLootOnChain(key, nonce, validBefore, signature) {
       const { contract, FAKE_HEAD_START_MS, FAKE_HUNT_MS } = w();
@@ -259,6 +260,20 @@ const run = async () => {
   victim.send({ type: 'dismiss' });
   phones.get('thief').appState = 'active';
   console.log('ok  a full catch: ticket, alert after the head start, radar, cancel, both phones agree');
+
+  // Giving up immunity and cooldown.
+  assert.ok(victim.getState().immuneUntil > Date.now(), 'the saved victim is immune');
+  assert.ok(thief.getState().readyAt > Date.now(), 'the caught thief lays low');
+  await victim.clearTimer('immunity');
+  await thief.clearTimer('cooldown');
+  assert.equal(victim.getState().immuneUntil, 0);
+  assert.equal(thief.getState().readyAt, 0);
+  console.log('ok  players can give up immunity and laying low');
+
+  // Sound off is remembered across a restart.
+  victim.send({ type: 'toggle', key: 'soundOn' });
+  assert.equal(JSON.parse(phones.get('victim').prefs.progress).soundOn, false);
+  victim.send({ type: 'toggle', key: 'soundOn' });
 
   // Escape, with a restart mid-heist. Restarting clears this round's local cooldown and immunity, which this fake contract doesn't keep.
   thief = await bootPhone('thief', true);

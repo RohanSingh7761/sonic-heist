@@ -99,6 +99,7 @@ const LOG_LIMIT = 300;
 
 // What survives an app restart. The stake and timers come back from the chain instead.
 export interface SavedProgress {
+  soundOn: boolean;
   micOk: boolean;
   soundOk: boolean;
   avatar: AvatarId;
@@ -120,7 +121,7 @@ export const initialState = (name: string, saved?: Partial<SavedProgress>): Game
     saves: saved?.saves ?? 0,
     micOk,
     soundOk,
-    soundOn: true,
+    soundOn: saved?.soundOn ?? true,
     patrol: true,
     shield: false,
     roundActive: true,
@@ -167,6 +168,7 @@ export type Action =
   | { type: 'setBalances'; wallet: number; stake: number; immuneUntil: number; readyAt: number }
   | { type: 'setUser'; name: string; walletAddress: string; thefts?: number }
   | { type: 'loggedOut' }
+  | { type: 'timerCleared'; timer: 'immunity' | 'cooldown' }
   | { type: 'addWin' }
   | { type: 'logEvent'; kind: LogEntry['kind']; text: string; at: number }
   | { type: 'clearLog' }
@@ -370,8 +372,10 @@ export function reduce(s: GameState, a: Action): GameState {
       return { ...s, wallet: a.wallet, stake: a.stake, immuneUntil: Math.max(s.immuneUntil, a.immuneUntil), readyAt: Math.max(s.readyAt, a.readyAt) };
     case 'setUser':
       return { ...s, auth: 'in', name: a.name, walletAddress: a.walletAddress, thefts: a.thefts ?? s.thefts };
+    case 'timerCleared':
+      return a.timer === 'immunity' ? { ...s, immuneUntil: 0 } : { ...s, readyAt: 0 };
     case 'loggedOut':
-      return { ...initialState(''), micOk: s.micOk, soundOk: s.soundOk, avatar: s.avatar, auth: 'out' };
+      return { ...initialState(''), soundOn: s.soundOn, micOk: s.micOk, soundOk: s.soundOk, avatar: s.avatar, auth: 'out' };
     case 'addWin':
       return addWin(s, 'thefts');
     case 'logEvent':

@@ -9,7 +9,7 @@
     "backgroundColor": "#2b2036",
     "android": {
       "package": "com.sonicheist",
-      "versionCode": 8,
+      "versionCode": 9,
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",

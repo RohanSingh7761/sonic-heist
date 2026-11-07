@@ -271,6 +271,18 @@ contract HeistVault {
         emit LootClaimed(lootId, loot.thief, loot.victim, loot.amount);
     }
 
+    // --- Giving up your own timers ---
+
+    /// @notice Gives up your immunity early, so you can be looted again.
+    function clearMyImmunity() external {
+        immuneUntil[msg.sender] = 0;
+    }
+
+    /// @notice Stops laying low early, so you can rob again. This makes the thief cooldown optional.
+    function clearMyCooldown() external {
+        thiefReadyAt[msg.sender] = 0;
+    }
+
     // --- Signature Helper ---
     function recoverSigner(bytes32 digest, bytes memory sig) public pure returns (address) {
         if (sig.length == 65) {

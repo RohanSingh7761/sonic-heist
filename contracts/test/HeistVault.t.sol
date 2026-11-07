@@ -216,6 +216,31 @@ contract HeistVaultTest {
         vault.startLoot(nonce, validBefore, ticketSig);
     }
 
+    function test_PlayersCanClearOnlyTheirOwnTimers() public {
+        uint64 nonce = 1009;
+        uint32 validBefore = uint32(block.timestamp + 90);
+        bytes memory ticketSig = signTicket(victimKey, thief, nonce, validBefore);
+        vm.prank(thief);
+        uint256 lootId = vault.startLoot(nonce, validBefore, ticketSig);
+        (, , , , , , uint40 deadline, ) = vault.loots(lootId);
+        vm.warp(uint256(deadline) + 1);
+        vault.claim(lootId);
+        assertTrue(vault.immuneUntil(victim) > 0);
+        assertTrue(vault.thiefReadyAt(thief) > 0);
+
+        vm.prank(thief);
+        vault.clearMyImmunity(); // Someone else's call doesn't touch the victim's immunity
+        assertTrue(vault.immuneUntil(victim) > 0);
+
+        vm.prank(victim);
+        vault.clearMyImmunity();
+        assertEq(vault.immuneUntil(victim), 0);
+
+        vm.prank(thief);
+        vault.clearMyCooldown();
+        assertEq(vault.thiefReadyAt(thief), 0);
+    }
+
     // --- Helpers ---
     function vmAddr(uint256 privKey) internal pure returns (address) {
         // Must be the key's real address: tickets signed with vm.sign recover to it.

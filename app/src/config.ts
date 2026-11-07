@@ -5,6 +5,8 @@ export const CONFIG = {
   chainName: 'Base Sepolia',
   rpcUrl: 'https://sepolia.base.org', // Public on purpose: anyone can extract a private API key from an APK
   heistVaultAddress: '0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA' as `0x${string}`,
+  // The deployed vault can't clear these yet. Turn on with the address of a vault that has clearMyImmunity and clearMyCooldown.
+  canClearTimers: false,
   blockExplorer: 'https://base-sepolia.blockscout.com/address/0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA',
 };
 
@@ -73,6 +75,8 @@ export const HEIST_VAULT_ABI = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
+  { type: 'function', name: 'clearMyImmunity', inputs: [], outputs: [], stateMutability: 'nonpayable' },
+  { type: 'function', name: 'clearMyCooldown', inputs: [], outputs: [], stateMutability: 'nonpayable' },
   {
     type: 'function',
     name: 'immuneUntil',

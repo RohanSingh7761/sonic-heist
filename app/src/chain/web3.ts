@@ -173,6 +173,9 @@ export async function startLootOnChain(privateKey: `0x${string}`, nonce: bigint,
 export const cancelLootOnChain = (privateKey: `0x${string}`, lootId: number, challenge: Uint8Array, thiefSignature: Uint8Array) =>
   send(privateKey, { functionName: 'cancel', args: [BigInt(lootId), bytesToHex(challenge), bytesToHex(thiefSignature)] });
 
+export const clearTimerOnChain = (privateKey: `0x${string}`, timer: 'immunity' | 'cooldown') =>
+  send(privateKey, { functionName: timer === 'immunity' ? 'clearMyImmunity' : 'clearMyCooldown' });
+
 export const claimLootOnChain = (privateKey: `0x${string}`, lootId: number) =>
   send(privateKey, { functionName: 'claim', args: [BigInt(lootId)] });
 

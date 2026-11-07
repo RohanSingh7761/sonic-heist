@@ -6,7 +6,7 @@ import { LEVEL_AT, MOCK_PLAYERS, SCAN_TIME, levelFor } from '../game';
 import { AVATARS, Art, BackBar, Bar, Btn, Chip, ClosenessMeter, Grow, Icon, LEVEL_TITLES, Panel, PlayerSprite, Row, Screen, Spread, Sprite, T, closeness, fmtEth, fmtTime, useLayout, useLoop } from '../kit';
 import { MY_SEAT, TableStage, rivalSeat, type SeatInfo } from '../stages';
 import { CONFIG } from '../../config';
-import { batteryUnrestricted, deposit, getSignalMode, logOut, openBatterySettings, robTarget, scan, setSignalMode, withdraw, type SignalMode } from '../../game/engine';
+import { batteryUnrestricted, clearTimer, deposit, getSignalMode, logOut, openBatterySettings, robTarget, saveWinsNow, scan, setSignalMode, withdraw, type SignalMode } from '../../game/engine';
 import { fetchLeaderboard, type LeaderboardRow } from '../../game/account';
 import { C, U } from '../theme';
 import { PickGrid } from './Intro';
@@ -186,18 +186,25 @@ export function Levels({ s, send, now }: Props) {
 }
 
 // screen.log
+const LEADERBOARD_REFRESH_MS = 10_000;
+
 export function Leaderboard({ s }: Props) {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const load = async () => {
     setError(null);
     try {
+      await saveWinsNow();
       setRows(await fetchLeaderboard());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the leaderboard.');
     }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const id = setInterval(load, LEADERBOARD_REFRESH_MS);
+    return () => clearInterval(id);
+  }, []);
   return (
     <Screen>
       <Spread>
@@ -208,6 +215,7 @@ export function Leaderboard({ s }: Props) {
         {error && <T color={C.redDark}>{error}</T>}
         {!error && rows === null && <T muted>Loading...</T>}
         {rows?.length === 0 && <T muted>No thieves yet. Be the first.</T>}
+        {rows && rows.length > 0 && <T size="small" muted>A rob counts once you get away and claim the loot.</T>}
         {rows?.map((row, i) => {
           const me = row.username.toLowerCase() === s.name.toLowerCase();
           return (
@@ -253,7 +261,9 @@ function SignalDropdown() {
 }
 
 // screen.settings
-export function Settings({ s, send }: Props) {
+export function Settings({ s, send, now }: Props) {
+  const immune = s.immuneUntil - now;
+  const cooldown = s.readyAt - now;
   const [unrestricted, setUnrestricted] = useState(batteryUnrestricted());
   useEffect(() => {
     const id = setInterval(() => setUnrestricted(batteryUnrestricted()), 2000);
@@ -273,6 +283,14 @@ export function Settings({ s, send }: Props) {
       {setting('Game sounds', 'Coins, sirens and music', 'soundOn')}
       {setting('Patrol', 'Listen for game signals nearby', 'patrol')}
       <SignalDropdown />
+      {CONFIG.canClearTimers && (immune > 0 || cooldown > 0) && (
+        <Panel style={{ gap: 6 }}>
+          <T>Back in the game</T>
+          <T size="small" muted>Give these up early if you don't want to wait.</T>
+          {immune > 0 && <Btn small onPress={() => clearTimer('immunity')}>{`Remove immunity (${fmtTime(immune)} left)`}</Btn>}
+          {cooldown > 0 && <Btn small onPress={() => clearTimer('cooldown')}>{`Stop laying low (${fmtTime(cooldown)} left)`}</Btn>}
+        </Panel>
+      )}
       <Panel style={{ gap: 6 }}>
         <T>{`Account: ${s.name}`}</T>
         <T size="small" muted>Log out to switch accounts. Log back in with your password to get this wallet back.</T>
