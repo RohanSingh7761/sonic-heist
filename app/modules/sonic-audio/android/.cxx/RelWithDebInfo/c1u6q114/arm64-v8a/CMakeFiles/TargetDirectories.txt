@@ -1,0 +1,3 @@
+F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/.cxx/RelWithDebInfo/c1u6q114/arm64-v8a/CMakeFiles/ggwave_jni.dir
+F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/.cxx/RelWithDebInfo/c1u6q114/arm64-v8a/CMakeFiles/edit_cache.dir
+F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/.cxx/RelWithDebInfo/c1u6q114/arm64-v8a/CMakeFiles/rebuild_cache.dir

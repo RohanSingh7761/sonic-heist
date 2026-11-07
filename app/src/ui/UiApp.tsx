@@ -1,20 +1,23 @@
 // RN port of apps/web/src/ui/UiApp.tsx: routes views and heist phases, plays the automatic sounds, hosts the overlays.
-import React, { useEffect, useReducer, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import { BackHandler, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MOCK_PLAYERS, initialState, reduce, type Action, type GameState, type View as ViewId } from './game';
-import { AVATARS, Btn, Icon, LEVEL_TITLES, Panel, Spread, Sprite, T, setSoundOn, sfx, useLayout, useNow, type IconName } from './kit';
+import type { Action, GameState, View as ViewId } from './game';
+import { boot, getState, send, subscribe } from '../game/engine';
+import { AVATARS, Btn, Icon, LEVEL_TITLES, Panel, Sprite, T, sfx, useLayout, useNow, type IconName } from './kit';
 import { soundFX } from './soundFX';
 import { Pick, RoundStart, Setup, Title } from './screens/Intro';
-import { Levels, Log, Scan, Settings, TableHome } from './screens/Home';
+import { Auth } from './screens/Auth';
+import { Splash } from './screens/Splash';
+import { Leaderboard, Levels, Scan, Settings, TableHome } from './screens/Home';
 import { HeistScreen } from './screens/Heist';
 import { C, U } from './theme';
 
-const PLAYER_NAME = 'Sly Fox 3F2A'; // mock: comes from the wallet's uid once integrated
+const SPLASH_MS = 1800;
 const TABS: { view: ViewId; label: string; icon: IconName }[] = [
   { view: 'table', label: 'Table', icon: 'table' },
   { view: 'levels', label: 'Levels', icon: 'star' },
-  { view: 'log', label: 'Activity', icon: 'scroll' },
+  { view: 'leaders', label: 'Top thieves', icon: 'scroll' },
   { view: 'settings', label: 'Settings', icon: 'gear' },
 ];
 
@@ -36,42 +39,29 @@ function LevelUp({ s, send }: { s: GameState; send: (a: Action) => void }) {
   );
 }
 
-// overlay.demo: lets you reach every state from one phone, since the mock has no second player.
-function DemoControls({ s, send, now }: { s: GameState; send: (a: Action) => void; now: number }) {
-  const [open, setOpen] = useState(false);
-  const act = (a: Action) => { send(a); setOpen(false); };
-  const canCatch = s.heist?.phase === 'headstart' || s.heist?.phase === 'hunted';
-  const cell = { width: '48%' as const };
-  return (
-    <>
-      <Pressable accessibilityRole="button" accessibilityLabel="Demo controls" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)}
-        style={{ position: 'absolute', right: 0, top: '40%', zIndex: 50, backgroundColor: C.ink, paddingVertical: 10, paddingHorizontal: 5 }}>
-        {'DEMO'.split('').map((ch, i) => <T key={i} size={16} color={C.gold} center>{ch}</T>)}
-      </Pressable>
-      {open && (
-        <Panel style={{ position: 'absolute', left: 8, right: 8, bottom: 8, zIndex: 60, gap: 6 }}>
-          <Spread><T>Demo controls</T><T size="small" muted>Not part of the game</T></Spread>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 4 }}>
-            <Btn small style={cell} onPress={() => act({ type: 'incoming', now, rival: MOCK_PLAYERS[Math.floor(Math.random() * 4)], lootRate: 0.05 + Math.random() * 0.2 })}>Someone robs me</Btn>
-            <Btn small style={cell} disabled={!canCatch} onPress={() => act({ type: 'victimFoundMe', now })}>Victim finds me</Btn>
-            <Btn small style={cell} onPress={() => act({ type: 'skip', now })}>Skip timer</Btn>
-            <Btn small style={cell} onPress={() => act({ type: 'addWin' })}>+1 win</Btn>
-            <Btn small style={cell} onPress={() => { setOpen(false); send({ type: 'reset', name: PLAYER_NAME }); }}>Restart</Btn>
-            <Btn small style={cell} onPress={() => setOpen(false)}>Close</Btn>
-          </View>
-        </Panel>
-      )}
-    </>
-  );
-}
-
 export function UiApp() {
-  const [s, send] = useReducer(reduce, PLAYER_NAME, initialState);
+  const s = useSyncExternalStore(subscribe, getState);
   const now = useNow();
   const insets = useSafeAreaInsets();
-  useEffect(() => { send({ type: 'tick', now }); }, [now]);
-  useEffect(() => { setSoundOn(s.soundOn); }, [s.soundOn]);
-  useEffect(() => { soundFX.preload(); }, []);
+  const [splashDone, setSplashDone] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setSplashDone(true), SPLASH_MS);
+    return () => clearTimeout(id);
+  }, []);
+  useEffect(() => {
+    soundFX.preload();
+    boot();
+  }, []);
+  // Back from a tab or the radar returns to the table. Everywhere else it leaves the app, and the game keeps running.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const { heist, view } = getState();
+      if (heist || !['scan', 'levels', 'leaders', 'settings'].includes(view)) return false;
+      send({ type: 'go', view: 'table' });
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!s.notice) return;
@@ -79,22 +69,6 @@ export function UiApp() {
     const id = setTimeout(() => send({ type: 'clearNotice' }), 3200);
     return () => clearTimeout(id);
   }, [s.notice]);
-
-  // One-off sounds for moments the game state reaches on its own.
-  const prev = useRef(s.heist);
-  useEffect(() => {
-    const was = prev.current;
-    const h = s.heist;
-    prev.current = h;
-    if (!h) return;
-    if (h.phase !== was?.phase) {
-      if (h.phase === 'grab') sfx('loot-grab');
-      if (h.phase === 'disguise') sfx('bling');
-      if (h.phase === 'headstart') sfx('dash');
-      if (h.phase === 'hunted') sfx('bang');
-    }
-    if (h.inRange && !was?.inRange) sfx('thief-near');
-  }, [s.heist]);
 
   // Countdown ticks for the last 10 seconds of a hunt.
   const remaining = s.heist?.deadline != null ? Math.ceil((s.heist.deadline - now) / 1000) : null;
@@ -104,6 +78,8 @@ export function UiApp() {
   }, [remaining]);
 
   const p = { s, send, now };
+  if (!splashDone || s.auth === 'loading') return <Splash />;
+  if (s.auth === 'out') return <Auth />;
   const onTab = !s.heist && TABS.some((t) => t.view === s.view);
   return (
     <View style={{ flex: 1, backgroundColor: C.night }}>
@@ -117,7 +93,7 @@ export function UiApp() {
             {s.view === 'table' && <TableHome {...p} />}
             {s.view === 'scan' && <Scan {...p} />}
             {s.view === 'levels' && <Levels {...p} />}
-            {s.view === 'log' && <Log {...p} />}
+            {s.view === 'leaders' && <Leaderboard {...p} />}
             {s.view === 'settings' && <Settings {...p} />}
           </>
         )}
@@ -141,7 +117,6 @@ export function UiApp() {
           </View>
         )}
         <LevelUp s={s} send={send} />
-        <DemoControls {...p} />
       </View>
     </View>
   );

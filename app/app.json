@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Sonic Heist",
-    "slug": "sonic-heist",
+    "name": "steal-eth",
+    "slug": "steal-eth",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,8 +9,15 @@
     "backgroundColor": "#2b2036",
     "android": {
       "package": "com.sonicheist",
+      "versionCode": 8,
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#2b2036",
+        "backgroundColor": "#e5484d",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -22,6 +29,8 @@
     },
     "plugins": [
       "expo-audio",
+      "expo-secure-store",
+      ["expo-splash-screen", { "backgroundColor": "#2b2036", "image": "./assets/splash-logo.png", "imageWidth": 240, "resizeMode": "contain" }],
       "expo-font",
       "expo-asset"
     ]

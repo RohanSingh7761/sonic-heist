@@ -124,6 +124,8 @@ Thumbs.db
 # Expo
 .expo/
 app/dist/
+app/android/
 
 # Built APK served by the download site (too big for git)
 apps/site/public/*.apk
+*.keystore

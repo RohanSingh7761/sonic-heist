@@ -1,10 +1,11 @@
 // RN port of apps/web/src/ui/screens/Intro.tsx. Screen IDs and assets: docs/SCREENS.md "Getting started".
-import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import React, { useState } from 'react';
+import { Share, View } from 'react-native';
 import type { Action, AvatarId, GameState } from '../game';
 import { MOCK_PLAYERS, levelFor } from '../game';
 import { AVATARS, Art, Btn, Chip, Grow, Icon, Panel, Row, Screen, Spread, Sprite, T, fmtEth, sfx, useLayout, useLoop } from '../kit';
 import { RunStage, type Runner } from '../stages';
+import { allowMic, soundCheck } from '../../game/engine';
 import { C } from '../theme';
 
 type Props = { s: GameState; send: (a: Action) => void };
@@ -26,7 +27,7 @@ export function Title({ send }: Props) {
       </>
     }>
       <Grow />
-      <Art name="logo" width={Math.min(cw * 0.74, 300)} label="Sonic Heist" />
+      <Art name="logo" width={Math.min(cw * 0.74, 300)} label="steal-eth" />
       <T muted center style={{ paddingHorizontal: 20 }}>A real-world heist played over sound.</T>
       <Grow />
       <RunStage runners={TITLE_RUNNERS} />
@@ -83,31 +84,30 @@ export function PickGrid({ s, send, level, card }: Props & { level: 1 | 2 | 3; c
 // screen.setup
 export function Setup({ s, send }: Props) {
   const [testing, setTesting] = useState(false);
-  useEffect(() => {
-    if (!testing) return;
-    const id = setTimeout(() => { send({ type: 'soundOk' }); setTesting(false); sfx('coin'); }, 1400);
-    return () => clearTimeout(id);
-  }, [testing, send]);
-  const ready = s.micOk && s.soundOk && s.stake > 0;
+  const runCheck = async () => {
+    setTesting(true);
+    await soundCheck();
+    setTesting(false);
+  };
+  const ready = s.micOk && s.soundOk;
   return (
-    <Screen footer={<Btn tone="gold" big disabled={!ready} onPress={() => send({ type: 'go', view: 'round' })}>{ready ? 'Join the table' : 'Finish all 3 steps'}</Btn>}>
+    <Screen footer={<Btn tone="gold" big disabled={!ready} onPress={() => send({ type: 'go', view: 'round' })}>{ready ? 'Join the table' : 'Finish both steps'}</Btn>}>
       <T size="title">Get ready</T>
       <Panel style={{ gap: 6 }}>
         <Spread><Row><Icon name="mic" /><T>1. Microphone</T></Row>{s.micOk && <Chip tone="good">Allowed</Chip>}</Spread>
-        <T size="small" muted>Listens for game signals only. Nothing is recorded, stored or uploaded.</T>
-        {!s.micOk && <Btn small onPress={() => send({ type: 'micOk' })}>Allow microphone</Btn>}
+        <T size="small" muted>While patrol is on, including when your phone is locked, the app listens for game signals. A notification stays up the whole time. Audio stays on this phone and nothing is recorded.</T>
+        {!s.micOk && <Btn small onPress={allowMic}>Allow microphone</Btn>}
       </Panel>
       <Panel style={{ gap: 6 }}>
         <Spread><Row><Icon name="flame" /><T>2. Sound check</T></Row>{s.soundOk && <Chip tone="good">Passed</Chip>}</Spread>
-        <T size="small" muted>Checks that this phone can send and hear the signal.</T>
-        {!s.soundOk && <Btn small disabled={testing || !s.micOk} click="radar-ping" onPress={() => setTesting(true)}>{testing ? 'Listening...' : s.micOk ? 'Run check' : 'Allow microphone first'}</Btn>}
+        <T size="small" muted>Checks that this phone can create and play the signal.</T>
+        {!s.soundOk && <Btn small disabled={testing || !s.micOk} click={null} onPress={runCheck}>{testing ? 'Playing...' : s.micOk ? 'Run check' : 'Allow microphone first'}</Btn>}
       </Panel>
       <Panel style={{ gap: 6 }}>
-        <Spread><Row><Icon name="coin" /><T>3. Your stake</T></Row>{s.stake > 0 && <Chip tone="good">{`${fmtEth(s.stake)} ETH`}</Chip>}</Spread>
-        <T size="small" muted>{`This is what others can steal, 5% to 25% at a time. Gas stays in your wallet (${fmtEth(s.wallet)} ETH).`}</T>
-        <Row>
-          {[0.05, 0.1, 0.2].map((v) => <Btn key={v} small click="deposit" style={{ flex: 1 }} onPress={() => send({ type: 'deposit', amount: v })}>{`+${v}`}</Btn>)}
-        </Row>
+        <Row><Icon name="coin" /><T>Your wallet</T></Row>
+        <T size="small" muted>Send Base Sepolia test ETH here. You can stake it from the table once you join.</T>
+        <T size="small">{s.walletAddress ?? 'Creating your wallet...'}</T>
+        <Btn small disabled={!s.walletAddress} onPress={() => Share.share({ message: s.walletAddress as string })}>Share address</Btn>
       </Panel>
     </Screen>
   );
@@ -131,7 +131,7 @@ export function RoundStart({ s, send }: Props) {
       <T muted>Round started</T>
       <T size={54} color={C.gold} center>Everyone runs!</T>
       <RunStage runners={runners} />
-      <T center style={{ padding: 16 }}>Your stake is locked in. Keep your phone on you and stay on patrol.</T>
+      <T center style={{ padding: 16 }}>Keep your phone on you and stay on patrol.</T>
       <Grow />
     </Screen>
   );

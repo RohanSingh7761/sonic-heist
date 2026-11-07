@@ -1,8 +1,9 @@
 // RN port of apps/web/src/ui/screens/Heist.tsx. Screen IDs and assets: docs/SCREENS.md "Thief" and "Victim".
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Vibration, View } from 'react-native';
 import type { Action, GameState, Heist as HeistState } from '../game';
-import { MOCK_PLAYERS, TICKET_TIME, levelFor } from '../game';
+import { HANDSHAKE_TIME, MOCK_PLAYERS, TICKET_TIME, levelFor } from '../game';
+import { catchThief, claimLoot, pulseRadar } from '../../game/engine';
 import { Bar, Btn, ClosenessMeter, Grow, Panel, Screen, Spread, Sprite, T, closeness, fmtEth, fmtTime, sfx, useLayout, useLoop } from '../kit';
 import { MY_SEAT, RunStage, TableStage, pathToSeat, rivalSeat } from '../stages';
 import { Blip, Hud, Radar, tableSeats } from './Home';
@@ -22,15 +23,16 @@ function Timer({ ms, color, pulse, size }: { ms: number; color?: string; pulse?:
 // heist.ticket / heist.grab / heist.disguise
 function Sneak({ s, h }: Props) {
   const level = levelFor(s.thefts + s.saves);
-  const seatIdx = rivalSeat(MOCK_PLAYERS.findIndex((p) => p.uid === h.rival.uid));
+  const mockIdx = MOCK_PLAYERS.findIndex((p) => p.uid === h.rival.uid);
+  const seatIdx = rivalSeat(mockIdx >= 0 ? mockIdx : h.rival.uid % 4);
   const path = pathToSeat(MY_SEAT, seatIdx);
   const end = path[path.length - 1];
   const moving = h.phase === 'ticket';
-  useLoop(s.soundOn && moving ? 'sneak-loop' : null, 0.55);
+  // Silent while the ticket is on its way over sound.
   const copy = {
     ticket: ['Sneaking in...', 'Sent the request. Waiting for their phone to sign a ticket.'],
-    grab: ['Grabbing the stake!', 'Ticket signed. The loot is locked in escrow on-chain.'],
-    disguise: ['Glasses on.', 'Nobody saw a thing. Get ready to run.'],
+    grab: ['Grabbing the stake!', 'Ticket signed. Locking the loot in escrow on-chain...'],
+    disguise: ['Glasses on.', 'The loot is locked in escrow. Get ready to run.'],
   }[h.phase as 'ticket' | 'grab' | 'disguise'];
   return (
     <Screen>
@@ -42,7 +44,7 @@ function Sneak({ s, h }: Props) {
       <Panel>
         <T size="heading">{copy[0]}</T>
         <T size="small" muted>{copy[1]}</T>
-        {h.phase !== 'ticket' && <Spread style={{ marginTop: 6 }}><T>{`Loot ${fmtEth(h.amount)} ETH`}</T><T>{`Bond ${fmtEth(h.bond)}`}</T></Spread>}
+        {h.phase === 'disguise' && <Spread style={{ marginTop: 6 }}><T>{`Loot ${fmtEth(h.amount)} ETH`}</T><T>{`Bond ${fmtEth(h.bond)}`}</T></Spread>}
       </Panel>
       <T size="small" muted center>Only you can see this. Everyone else's table looks normal.</T>
     </Screen>
@@ -86,13 +88,19 @@ function Result({ mood, sprite, title, children, action }: { mood: Mood; sprite:
 }
 
 // heist.won
-function Won({ s, send, h }: Props) {
+function Won({ s, h }: Props) {
   const { hero } = useLayout();
   const level = levelFor(s.thefts + s.saves);
+  const [claiming, setClaiming] = useState(false);
   useEffect(() => { sfx('swag'); }, []);
+  const claim = async () => {
+    setClaiming(true);
+    await claimLoot();
+    setClaiming(false); // Still on this screen only if the claim failed, so it can be tried again
+  };
   return (
     <Result mood="gold" title="You got away!" sprite={<Sprite size={hero} avatar={s.avatar} level={level} state="swag" label="Your avatar in gold chain and shades" />}
-      action={<Btn tone="teal" big click="jackpot" onPress={() => send({ type: 'claim' })}>{`Claim +${fmtEth(h.amount + h.bond)} ETH`}</Btn>}>
+      action={<Btn tone="teal" big disabled={claiming} click="jackpot" onPress={claim}>{claiming ? 'Claiming on-chain...' : `Claim +${fmtEth(h.amount + h.bond)} ETH`}</Btn>}>
       <Panel>
         <Spread><T size="small">{`Stolen from ${h.rival.name}`}</T><T size="small">{`+${fmtEth(h.amount)}`}</T></Spread>
         <Spread><T size="small">Your bond back</T><T size="small">{`+${fmtEth(h.bond)}`}</T></Spread>
@@ -123,8 +131,7 @@ function Caught({ s, send, h }: Props) {
 function Alert({ s, send, h, now }: Props) {
   const { hero } = useLayout();
   const level = levelFor(s.thefts + s.saves);
-  useEffect(() => { sfx('robbed'); Vibration.vibrate([0, 200, 100, 200]); }, []);
-  useLoop(s.soundOn ? 'alert' : null, 0.45);
+  useEffect(() => { Vibration.vibrate([0, 200, 100, 200]); }, []);
   const flash = Math.floor(now / 500) % 2 === 1;
   return (
     <Screen mood="red" bg={flash ? C.redDark : undefined} center footer={<Btn tone="gold" big onPress={() => send({ type: 'hunt' })}>Start the hunt</Btn>}>
@@ -140,20 +147,26 @@ function Alert({ s, send, h, now }: Props) {
 }
 
 // heist.hunting / heist.handshake
-function Hunt({ s, send, h, now }: Props) {
+function Hunt({ s, h, now }: Props) {
   const level = levelFor(s.thefts + s.saves);
   const shaking = h.phase === 'handshake';
+  const [pulsing, setPulsing] = useState(false);
+  const pulse = async () => {
+    setPulsing(true);
+    await pulseRadar();
+    setPulsing(false);
+  };
   const remaining = left(h, now);
   const footer = shaking ? (
     <Panel>
       <T>Catching them...</T>
       <T size="small" muted>Stay close. Exchanging signed messages, then cancelling on-chain.</T>
-      <Bar tone="red" pct={100 - (((h.phaseEnds as number) - now) / 4000) * 100} />
+      <Bar tone="red" pct={100 - (((h.phaseEnds as number) - now) / HANDSHAKE_TIME) * 100} />
     </Panel>
   ) : (
     <View style={{ gap: 8 }}>
-      <Btn big disabled={h.inRange} click="radar-ping" onPress={() => send({ type: 'pulse' })}>{h.inRange ? 'Thief located' : 'Pulse radar'}</Btn>
-      <Btn tone="red" big disabled={!h.inRange} click="bang" onPress={() => send({ type: 'cancel', now })}>{h.inRange ? 'Catch them! Cancel heist' : 'Get closer to catch them'}</Btn>
+      <Btn big disabled={h.inRange || pulsing} click={null} onPress={pulse}>{h.inRange ? 'Thief located' : pulsing ? 'Listening...' : 'Pulse radar'}</Btn>
+      <Btn tone="red" big disabled={!h.inRange} click={null} onPress={catchThief}>{h.inRange ? 'Catch them! Cancel heist' : 'Get closer to catch them'}</Btn>
     </View>
   );
   return (

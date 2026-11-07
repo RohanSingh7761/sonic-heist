@@ -45,7 +45,8 @@ const entries = [];
 for (const file of walk(SRC).sort()) {
   const key = relative(SRC, file).replace(/\\/g, '/').replace(/\.svg$/, '');
   if (SKIP.has(key)) continue;
-  const svg = readFileSync(file, 'utf8');
+  // The app's logo differs from the web's; scripts/gen-brand.mjs draws it.
+  const svg = readFileSync(key === 'logo' ? join(APP, 'assets/art/logo.svg') : file, 'utf8');
   const info = parse(svg);
   // Self-check: the frame times must add up to the SVG's own loop length, or the RN animation drifts.
   assert.ok(info.frames.length >= 1, `${key}: no frames`);

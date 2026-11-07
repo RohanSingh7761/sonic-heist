@@ -1,0 +1,12 @@
+[
+{
+  "directory": "F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/.cxx/RelWithDebInfo/c1u6q114/arm64-v8a",
+  "command": "C:\\Users\\Dell\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android24 --sysroot=C:/Users/Dell/AppData/Local/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dggwave_jni_EXPORTS -I\"F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/src/main/cpp/ggwave/include\" -I\"F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/src/main/cpp/ggwave/src\" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -O2 -g -DNDEBUG -fPIC -O3 -w -o CMakeFiles\\ggwave_jni.dir\\ggwave-jni.cpp.o -c \"F:\\Rohan Folder\\Hackathon Stuff\\sonicpay\\app\\modules\\sonic-audio\\android\\src\\main\\cpp\\ggwave-jni.cpp\"",
+  "file": "F:\\Rohan Folder\\Hackathon Stuff\\sonicpay\\app\\modules\\sonic-audio\\android\\src\\main\\cpp\\ggwave-jni.cpp"
+},
+{
+  "directory": "F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/.cxx/RelWithDebInfo/c1u6q114/arm64-v8a",
+  "command": "C:\\Users\\Dell\\AppData\\Local\\Android\\Sdk\\ndk\\27.1.12297006\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=aarch64-none-linux-android24 --sysroot=C:/Users/Dell/AppData/Local/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dggwave_jni_EXPORTS -I\"F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/src/main/cpp/ggwave/include\" -I\"F:/Rohan Folder/Hackathon Stuff/sonicpay/app/modules/sonic-audio/android/src/main/cpp/ggwave/src\" -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -O2 -g -DNDEBUG -fPIC -O3 -w -o CMakeFiles\\ggwave_jni.dir\\ggwave\\src\\ggwave.cpp.o -c \"F:\\Rohan Folder\\Hackathon Stuff\\sonicpay\\app\\modules\\sonic-audio\\android\\src\\main\\cpp\\ggwave\\src\\ggwave.cpp\"",
+  "file": "F:\\Rohan Folder\\Hackathon Stuff\\sonicpay\\app\\modules\\sonic-audio\\android\\src\\main\\cpp\\ggwave\\src\\ggwave.cpp"
+}
+]

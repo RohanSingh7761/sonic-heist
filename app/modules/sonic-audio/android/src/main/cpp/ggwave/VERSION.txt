@@ -1,0 +1,2 @@
+ggwave v0.4.0, commit e035c75, from https://github.com/ggerganov/ggwave (MIT).
+Matches the npm ggwave 0.4.0 that apps/web uses. Unmodified.

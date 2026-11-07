@@ -1,6 +1,7 @@
 // RN port of apps/web/src/ui/kit.tsx: sprites, sound helpers and the pixel controls every screen shares.
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, Text, View, useWindowDimensions, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { AppState, Image, Pressable, ScrollView, Text, View, useWindowDimensions, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect } from 'react-native-svg';
 import type { AvatarId, Level, Player } from './game';
@@ -64,10 +65,15 @@ export const setSoundOn = (on: boolean) => { soundOn = on; };
 export const sfx = (name: SfxName, volume = 0.6) => { if (soundOn) soundFX.play(name, { volume }); };
 // Plays while the component using it is mounted, stops on unmount or when muted.
 export function useLoop(name: SfxName | null, volume = 0.5, on = true) {
+  const [active, setActive] = useState(AppState.currentState === 'active');
   useEffect(() => {
-    if (!name || !on) return;
+    const sub = AppState.addEventListener('change', (next) => setActive(next === 'active'));
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    if (!name || !on || !active) return;
     return soundFX.play(name, { loop: true, volume });
-  }, [name, volume, on]);
+  }, [name, volume, on, active]);
 }
 
 // ---------- text and layout ----------
@@ -90,6 +96,7 @@ export function Screen({ mood = 'cream', bg, center, flush, footer, children }: 
   return (
     <MoodCtx.Provider value={m}>
       <View style={{ flex: 1, backgroundColor: bg ?? m.bg }}>
+        <StatusBar style={m.dark ? 'light' : 'dark'} />
         <ScrollView contentContainerStyle={{ flexGrow: 1, gap: 12, paddingTop: Math.max(14, insets.top), paddingHorizontal: flush ? 0 : 16, paddingBottom: 16, alignItems: center ? 'center' : 'stretch' }}>
           {children}
         </ScrollView>

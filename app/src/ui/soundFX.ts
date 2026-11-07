@@ -36,6 +36,9 @@ const FILES = {
 export type SfxName = keyof typeof FILES;
 export const SFX_NAMES = Object.keys(FILES) as SfxName[];
 
+// These were too hectic at full speed.
+const LOOP_RATE: Partial<Record<SfxName, number>> = { 'run-loop': 0.65, 'footsteps-loop': 0.65, 'sneak-loop': 0.75 };
+
 class SoundFX {
   // One reusable player per one-shot sound; loops get their own player so they can overlap a one-shot.
   private shots = new Map<SfxName, AudioPlayer>();
@@ -51,7 +54,7 @@ class SoundFX {
 
   // Create every player up front so the first play of a sound has no delay.
   preload() {
-    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+    setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: false }).catch(() => {});
     SFX_NAMES.forEach((n) => this.shot(n));
   }
 
@@ -63,6 +66,7 @@ class SoundFX {
         p.loop = true;
         p.volume = volume;
         p.play();
+        p.setPlaybackRate(LOOP_RATE[name] ?? 1);
         return () => p.remove();
       }
       const p = this.shot(name);

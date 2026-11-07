@@ -102,50 +102,43 @@ export function decodeTicket(bytes: Uint8Array): TicketMessage | null {
   };
 }
 
-// CATCH (77 bytes)
-export function encodeCatch(msg: Omit<CatchMessage, 'type'>): Uint8Array {
+// CATCH and CAUGHT share a layout (77 bytes)
+function encodeSigned(type: MessageType, msg: { lootId: number; challenge: Uint8Array; signature: Uint8Array }): Uint8Array {
   const buf = new ArrayBuffer(77);
   const view = new DataView(buf);
   const u8 = new Uint8Array(buf);
-  view.setUint8(0, MessageType.CATCH);
+  view.setUint8(0, type);
   view.setUint32(1, msg.lootId, false);
   u8.set(msg.challenge.subarray(0, 8), 5);
   u8.set(msg.signature.subarray(0, 64), 13);
   return u8;
+}
+
+function decodeSigned(bytes: Uint8Array) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return {
+    lootId: view.getUint32(1, false),
+    challenge: bytes.slice(5, 13),
+    signature: bytes.slice(13, 77),
+  };
+}
+
+export function encodeCatch(msg: Omit<CatchMessage, 'type'>): Uint8Array {
+  return encodeSigned(MessageType.CATCH, msg);
 }
 
 export function decodeCatch(bytes: Uint8Array): CatchMessage | null {
   if (bytes.length !== 77 || bytes[0] !== MessageType.CATCH) return null;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  return {
-    type: MessageType.CATCH,
-    lootId: view.getUint32(1, false),
-    challenge: bytes.slice(5, 13),
-    signature: bytes.slice(13, 77),
-  };
+  return { type: MessageType.CATCH, ...decodeSigned(bytes) };
 }
 
-// CAUGHT (77 bytes)
 export function encodeCaught(msg: Omit<CaughtMessage, 'type'>): Uint8Array {
-  const buf = new ArrayBuffer(77);
-  const view = new DataView(buf);
-  const u8 = new Uint8Array(buf);
-  view.setUint8(0, MessageType.CAUGHT);
-  view.setUint32(1, msg.lootId, false);
-  u8.set(msg.challenge.subarray(0, 8), 5);
-  u8.set(msg.signature.subarray(0, 64), 13);
-  return u8;
+  return encodeSigned(MessageType.CAUGHT, msg);
 }
 
 export function decodeCaught(bytes: Uint8Array): CaughtMessage | null {
   if (bytes.length !== 77 || bytes[0] !== MessageType.CAUGHT) return null;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  return {
-    type: MessageType.CAUGHT,
-    lootId: view.getUint32(1, false),
-    challenge: bytes.slice(5, 13),
-    signature: bytes.slice(13, 77),
-  };
+  return { type: MessageType.CAUGHT, ...decodeSigned(bytes) };
 }
 
 // Unified decoder for incoming audio packets

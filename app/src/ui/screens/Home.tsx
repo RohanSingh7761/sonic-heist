@@ -1,11 +1,13 @@
 // RN port of apps/web/src/ui/screens/Home.tsx. Screen IDs and assets: docs/SCREENS.md "Main tabs".
-import React, { useState } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Linking, Pressable, Share, View } from 'react-native';
 import type { Action, GameState, Level, Player } from '../game';
 import { LEVEL_AT, MOCK_PLAYERS, SCAN_TIME, levelFor } from '../game';
 import { AVATARS, Art, BackBar, Bar, Btn, Chip, ClosenessMeter, Grow, Icon, LEVEL_TITLES, Panel, PlayerSprite, Row, Screen, Spread, Sprite, T, closeness, fmtEth, fmtTime, useLayout, useLoop } from '../kit';
 import { MY_SEAT, TableStage, rivalSeat, type SeatInfo } from '../stages';
 import { CONFIG } from '../../config';
+import { batteryUnrestricted, deposit, getSignalMode, logOut, openBatterySettings, robTarget, scan, setSignalMode, withdraw, type SignalMode } from '../../game/engine';
+import { fetchLeaderboard, type LeaderboardRow } from '../../game/account';
 import { C, U } from '../theme';
 import { PickGrid } from './Intro';
 
@@ -49,25 +51,24 @@ export function TableHome({ s, send, now }: Props) {
       <Hud s={s} />
       <TableStage seats={tableSeats(s)} />
       <Row style={{ flexWrap: 'wrap', gap: 6 }}>
-        <Chip tone={s.patrol && !s.shield ? 'good' : 'plain'}><Icon name="mic" small color={C.ink} />{s.patrol ? 'On patrol' : 'Patrol off'}</Chip>
-        {s.shield && <Chip tone="warn"><Icon name="shield" small color={C.ink} />Shielded</Chip>}
+        <Chip tone={s.patrol ? 'good' : 'plain'}><Icon name="mic" small color={C.ink} />{s.patrol ? 'On patrol' : 'Patrol off'}</Chip>
         {immune > 0 && <Chip tone="good"><Icon name="shield" small color={C.ink} />{`Immune ${fmtTime(immune)}`}</Chip>}
         {cooldown > 0 && <Chip tone="bad">{`Cooldown ${fmtTime(cooldown)}`}</Chip>}
       </Row>
-      <Btn tone="red" big disabled={cooldown > 0} click="radar-ping" onPress={() => send({ type: 'scan', now })}>
-        {cooldown > 0 ? `Lay low ${fmtTime(cooldown)}` : 'Scan for targets'}
+      <Btn tone="red" big disabled={cooldown > 0 || s.stake <= 0} click={null} onPress={scan}>
+        {cooldown > 0 ? `Lay low ${fmtTime(cooldown)}` : s.stake <= 0 ? 'Stake ETH to start scanning' : 'Scan for targets'}
       </Btn>
       <Row>
         <Btn small style={{ flex: 1 }} pressed={s.patrol} onPress={() => send({ type: 'toggle', key: 'patrol' })}><Icon name="mic" small color={C.ink} />Patrol</Btn>
-        <Btn small style={{ flex: 1 }} pressed={s.shield} click="shield-on" onPress={() => send({ type: 'toggle', key: 'shield' })}><Icon name="shield" small color={C.ink} />Shield</Btn>
         <Btn small style={{ flex: 1 }} pressed={stakeOpen} onPress={() => setStakeOpen(!stakeOpen)}><Icon name="coin" small color={C.ink} />Stake</Btn>
       </Row>
       {stakeOpen && (
         <Panel style={{ gap: 6 }}>
           <T size="small" muted>{`Wallet ${fmtEth(s.wallet)} ETH pays for gas. Only your stake can be stolen.`}</T>
           <Row>
-            <Btn small style={{ flex: 1 }} click="deposit" onPress={() => send({ type: 'deposit', amount: 0.05 })}>Add 0.05</Btn>
-            <Btn small style={{ flex: 1 }} click={null} onPress={() => send({ type: 'withdraw', amount: 0.05 })}>Take 0.05</Btn>
+            <Btn small style={{ flex: 1 }} click="deposit" onPress={() => deposit(0.005)}>Add 0.005</Btn>
+            <Btn small style={{ flex: 1 }} click="deposit" onPress={() => deposit(0.02)}>Add 0.02</Btn>
+            <Btn small style={{ flex: 1 }} click={null} onPress={() => withdraw(0.001)}>Take 0.001</Btn>
           </Row>
         </Panel>
       )}
@@ -100,18 +101,17 @@ export function Blip({ p, x, y, size, ring, onPress }: { p: Player; x: number; y
 
 // screen.scan
 export function Scan({ s, send, now }: Props) {
-  useLoop(s.soundOn && s.scanEnds !== null ? 'sneak-loop' : null, 0.3);
   const scanning = s.scanEnds !== null;
   const target = s.nearby.find((p) => p.uid === s.target);
   const left = scanning ? (s.scanEnds as number) - now : 0;
   const footer = scanning ? undefined : (
     <>
       {target ? (
-        <Btn tone="red" big click="heist-start" onPress={() => send({ type: 'rob', now, lootRate: 0.05 + Math.random() * 0.2 })}>{`Rob ${target.name.split(' ').slice(0, 2).join(' ')}`}</Btn>
+        <Btn tone="red" big click={null} onPress={() => robTarget(target)}>{`Rob ${target.name.split(' ').slice(0, 2).join(' ')}`}</Btn>
       ) : (
-        <Btn big click="radar-ping" onPress={() => send({ type: 'scan', now })}>Scan again</Btn>
+        <Btn big click={null} onPress={scan}>Scan again</Btn>
       )}
-      {target && <T size="small" muted center>Takes 5% to 25% of their stake. Your bond: 20% of the loot.</T>}
+      {target && <T size="small" muted center>Takes 5% to 25% of their stake, at least 0.001 ETH. Your bond: 20% of the loot.</T>}
     </>
   );
   return (
@@ -130,6 +130,7 @@ export function Scan({ s, send, now }: Props) {
           <Bar pct={100 - (left / SCAN_TIME) * 100} />
         </Panel>
       )}
+      {!scanning && s.nearby.length === 0 && <T muted center>Nobody answered. Move closer and scan again.</T>}
       {!scanning && s.nearby.length > 0 && (
         <>
           <T size="small" muted>You can't see how much anyone has. Pick your gamble.</T>
@@ -185,26 +186,80 @@ export function Levels({ s, send, now }: Props) {
 }
 
 // screen.log
-export function Log({ s }: Props) {
+export function Leaderboard({ s }: Props) {
+  const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = async () => {
+    setError(null);
+    try {
+      setRows(await fetchLeaderboard());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load the leaderboard.');
+    }
+  };
+  useEffect(() => { load(); }, []);
   return (
     <Screen>
-      <T size="title">Activity</T>
+      <Spread>
+        <T size="title">Top thieves</T>
+        <Btn small onPress={load}>Refresh</Btn>
+      </Spread>
       <Panel style={{ flexGrow: 1 }}>
-        {s.log.length === 0 && <T muted>Nothing yet. Your thefts and saves will show up here.</T>}
-        {s.log.map((e) => (
-          <Row key={e.id} style={{ alignItems: 'flex-start', gap: 8, paddingVertical: 8, borderBottomWidth: 2, borderStyle: 'dashed', borderColor: C.sand }}>
-            <View style={{ width: 10, height: 10, marginTop: 6, backgroundColor: e.kind === 'good' ? C.mint : e.kind === 'bad' ? C.red : C.muted }} />
-            <T size={19} style={{ flex: 1 }}>{e.text}</T>
-          </Row>
-        ))}
+        {error && <T color={C.redDark}>{error}</T>}
+        {!error && rows === null && <T muted>Loading...</T>}
+        {rows?.length === 0 && <T muted>No thieves yet. Be the first.</T>}
+        {rows?.map((row, i) => {
+          const me = row.username.toLowerCase() === s.name.toLowerCase();
+          return (
+            <Spread key={row.username} style={{ paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 2, borderStyle: 'dashed', borderColor: C.sand, backgroundColor: me ? C.pressed : undefined }}>
+              <Row style={{ flexShrink: 1 }}>
+                <T color={i < 3 ? C.goldDark : C.muted} style={{ width: 34 }}>{`${i + 1}.`}</T>
+                <T style={{ flexShrink: 1 }}>{row.username}{me ? ' (you)' : ''}</T>
+              </Row>
+              <T>{`${row.robs} ${row.robs === 1 ? 'rob' : 'robs'}`}</T>
+            </Spread>
+          );
+        })}
       </Panel>
     </Screen>
   );
 }
 
+const SIGNAL_OPTIONS: { mode: SignalMode; label: string }[] = [
+  { mode: 'max', label: 'Max (inaudible)' },
+  { mode: 'audible', label: 'Audible' },
+];
+
+function SignalDropdown() {
+  const [mode, setMode] = useState(getSignalMode());
+  const [open, setOpen] = useState(false);
+  const pick = (next: SignalMode) => {
+    setSignalMode(next);
+    setMode(next);
+    setOpen(false);
+  };
+  return (
+    <Panel style={{ gap: 6 }}>
+      <T>Signal sound</T>
+      <T size="small" muted>Sound your phone sends. Use Audible if phones can't find each other.</T>
+      <Btn small pressed={open} label={`Signal sound: ${SIGNAL_OPTIONS.find((o) => o.mode === mode)?.label}`} onPress={() => setOpen(!open)}>
+        {`${SIGNAL_OPTIONS.find((o) => o.mode === mode)?.label} ${open ? '▲' : '▼'}`}
+      </Btn>
+      {open && SIGNAL_OPTIONS.map((o) => (
+        <Btn key={o.mode} small pressed={o.mode === mode} onPress={() => pick(o.mode)}>{o.label}</Btn>
+      ))}
+    </Panel>
+  );
+}
+
 // screen.settings
 export function Settings({ s, send }: Props) {
-  const setting = (label: string, hint: string, k: 'soundOn' | 'shield' | 'patrol') => (
+  const [unrestricted, setUnrestricted] = useState(batteryUnrestricted());
+  useEffect(() => {
+    const id = setInterval(() => setUnrestricted(batteryUnrestricted()), 2000);
+    return () => clearInterval(id);
+  }, []);
+  const setting = (label: string, hint: string, k: 'soundOn' | 'patrol') => (
     <Panel>
       <Spread>
         <View style={{ flex: 1 }}><T>{label}</T><T size="small" muted>{hint}</T></View>
@@ -217,10 +272,26 @@ export function Settings({ s, send }: Props) {
       <T size="title">Settings</T>
       {setting('Game sounds', 'Coins, sirens and music', 'soundOn')}
       {setting('Patrol', 'Listen for game signals nearby', 'patrol')}
-      {setting('Shield', 'Stop answering pings, for private spaces', 'shield')}
+      <SignalDropdown />
+      <Panel style={{ gap: 6 }}>
+        <T>{`Account: ${s.name}`}</T>
+        <T size="small" muted>Log out to switch accounts. Log back in with your password to get this wallet back.</T>
+        <Btn small onPress={logOut}>Log out</Btn>
+      </Panel>
+      <Panel style={{ gap: 6 }}>
+        <T>Your wallet</T>
+        <T size="small" muted>Send Base Sepolia test ETH here. An encrypted copy of the key is on your account, and only your password can open it.</T>
+        <T size="small">{s.walletAddress ?? 'Loading...'}</T>
+        <Btn small disabled={!s.walletAddress} onPress={() => Share.share({ message: s.walletAddress as string })}>Share address</Btn>
+      </Panel>
+      <Panel style={{ gap: 6 }}>
+        <Spread><T>Background listening</T><Chip tone={unrestricted ? 'good' : 'warn'}>{unrestricted ? 'Allowed' : 'Limited'}</Chip></Spread>
+        <T size="small" muted>Some phones stop patrol in your pocket unless battery limits are removed.</T>
+        {!unrestricted && <Btn small onPress={openBatterySettings}>Remove battery limits</Btn>}
+      </Panel>
       <Panel>
         <T>Privacy</T>
-        <T size="small" muted>Your mic only decodes game signals. Nothing is recorded, stored or uploaded.</T>
+        <T size="small" muted>While patrol is on, a notification stays up and your mic only decodes game signals on this phone. No audio is recorded or uploaded. Turn patrol off and the mic turns off.</T>
       </Panel>
       <Panel>
         <T>Game contract</T>
