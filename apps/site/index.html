@@ -3,175 +3,177 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#f7f4ea" />
+    <meta name="theme-color" content="#2b2036" />
     <meta name="description" content="Download Sonic Heist for Android, a heist game you play with the phones around you over ultrasound." />
     <title>Sonic Heist for Android</title>
-    <link rel="icon" href="sprites/rocco/lv1/idle.svg" />
-    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
-    <link href="https://api.fontshare.com/v2/css?f[]=chillax@500,600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="icon" href="/sprites/rocco/lv1/idle.svg" />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/jersey15-latin.woff2" crossorigin />
+    <link rel="preload" as="image" href="/sprites/logo.svg" />
+    <link rel="stylesheet" href="./style.css" />
+    <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
 
-    <nav class="nav container" aria-label="Main">
-      <a class="wordmark" href="#top" aria-label="Sonic Heist, back to top"><img src="sprites/rocco/lv1/idle.svg" alt="" width="48" height="48" />Sonic Heist</a>
-      <div class="nav-end">
-        <a class="nav-link" href="#install">How to install</a>
-        <a class="btn" href="/sonic-heist.apk" download>Download</a>
+    <header class="topbar">
+      <a class="wordmark" href="#top" aria-label="Sonic Heist, back to top"><img src="/sprites/rocco/lv1/idle.svg" alt="" width="48" height="48" />Sonic Heist</a>
+      <div class="topbar-end">
+        <div class="loot" aria-hidden="true" title="Coins your thief has grabbed"><span class="coin-icon"></span>Loot <b>0</b><span class="chip warn">LV 1</span></div>
+        <button class="sound" type="button" aria-pressed="false"><span>Sound off</span></button>
+        <a class="btn gold get" href="/sonic-heist.apk" download>Download</a>
       </div>
-    </nav>
-
-    <header class="hero" id="top">
-      <div class="container hero-grid">
-        <div class="hero-text">
-          <h1>Can you rob the phone beside you?</h1>
-          <p class="lead">Yes. Sonic Heist is a heist game played over ultrasound.</p>
-          <div class="actions">
-            <a class="btn btn--primary" href="/sonic-heist.apk" download>Download for Android</a>
-            <a class="text-link" href="#heist">See a heist</a>
-          </div>
-        </div>
-        <figure class="radar-sheet">
-          <div class="torn-img" data-slot="hero-radar" data-kind="product" data-alt="The game's hunt radar with the thief in range">
-            <img src="screens/hunt.png" alt="The hunt radar: the thief in range, signal very close" width="390" height="844" fetchpriority="high" />
-          </div>
-        </figure>
-      </div>
+      <div class="fuse" aria-hidden="true"><i></i></div>
     </header>
 
-    <main id="main">
-      <section class="q" id="heist">
-        <div class="container">
-          <h2>What happens in a heist?</h2>
-          <div class="switch" data-switch>
-            <div class="seg" role="tablist" aria-label="A heist, step by step">
-              <button type="button" role="tab" id="t-scan" aria-controls="p-scan" aria-selected="true">Scan</button>
-              <button type="button" role="tab" id="t-rob" aria-controls="p-rob" aria-selected="false" tabindex="-1">Rob</button>
-              <button type="button" role="tab" id="t-run" aria-controls="p-run" aria-selected="false" tabindex="-1">Run</button>
-              <button type="button" role="tab" id="t-hunt" aria-controls="p-hunt" aria-selected="false" tabindex="-1">Hunt</button>
-            </div>
-            <div class="moments">
-            <section class="moment" role="tabpanel" id="p-scan" aria-labelledby="t-scan">
-              <div class="moment-text"><h3>Find who is in earshot</h3><p>Your phone pings the room and everyone on patrol answers. You never see what they hold.</p></div>
-              <figure class="phone" data-slot="scan" data-kind="product" data-alt="The scan screen with nearby players on the radar"><img src="screens/scan.png" alt="The scan screen: four players on the radar, one picked" width="390" height="844" loading="lazy" /></figure>
-            </section>
-            <section class="moment" role="tabpanel" id="p-rob" aria-labelledby="t-rob">
-              <div class="moment-text"><h3>Sneak to their seat</h3><p>Their phone signs a ticket. You take 5 to 25% of their stake and post a bond of 20% of the loot.</p></div>
-              <figure class="phone" data-slot="rob" data-kind="product" data-alt="The thief sneaking around the table"><img src="screens/sneak.png" alt="The table, with your thief sneaking toward a seat" width="390" height="844" loading="lazy" /></figure>
-            </section>
-            <section class="moment" role="tabpanel" id="p-run" aria-labelledby="t-run">
-              <div class="moment-text"><h3>10 seconds to vanish</h3><p>Then they find out. Stay out of range for 60 seconds and the loot is yours.</p></div>
-              <figure class="phone" data-slot="run" data-kind="product" data-alt="The head start countdown with the thief running"><img src="screens/run.png" alt="Head start: a 10 second countdown over your thief running with the loot" width="390" height="844" loading="lazy" /></figure>
-            </section>
-            <section class="moment" role="tabpanel" id="p-hunt" aria-labelledby="t-hunt">
-              <div class="moment-text"><h3>Or get hunted</h3><p>Your victim pulses a radar and closes in. If they catch you, they win your bond.</p></div>
-              <figure class="phone" data-slot="hunted" data-kind="product" data-alt="The thief being hunted, timer running"><img src="screens/hunted.png" alt="Hunted: your victim chasing you with a sonar, the timer running down" width="390" height="844" loading="lazy" /></figure>
-            </section>
-            </div>
+    <section class="hero" id="top">
+      <div class="hero-sky" aria-hidden="true"></div>
+      <div class="wrap hero-grid">
+        <div class="hero-text">
+          <img class="logo" src="/sprites/logo.svg" alt="Sonic Heist" width="352" height="192" />
+          <h1 data-perch="idle" data-say="Psst...">Can you rob the phone beside you?</h1>
+          <p class="lead">Yes. Sonic Heist is a heist game played over ultrasound.</p>
+          <div class="actions">
+            <a class="btn gold big get" href="/sonic-heist.apk" download>Download for Android</a>
+            <a class="link" href="#heist">See a heist</a>
           </div>
+        </div>
+        <div class="hero-phone">
+          <div class="sonar" aria-hidden="true"><i></i><i></i><i></i></div>
+          <figure class="device" data-story="hero" data-perch="sneak" data-say="Who's first?" role="img" aria-label="The game's scan screen: nearby players appear on the radar, one is picked and robbed">
+            <span class="hw" aria-hidden="true"><i>9:41</i><u></u></span><div class="device-screen"><img class="poster" src="/screens/scan.png" alt="" width="390" height="844" fetchpriority="high" /><div class="device-live" inert></div></div>
+          </figure>
+        </div>
+      </div>
+      <div class="hero-ground" aria-hidden="true" data-perch="swag" data-say="Take it!"></div>
+    </section>
+
+    <div class="ticker" aria-hidden="true" data-perch="run" data-still><div class="ticker-track"><span>SCAN * SNEAK * GRAB * RUN * HUNT * CATCH * LEVEL UP * </span><span>SCAN * SNEAK * GRAB * RUN * HUNT * CATCH * LEVEL UP * </span><span>SCAN * SNEAK * GRAB * RUN * HUNT * CATCH * LEVEL UP * </span><span>SCAN * SNEAK * GRAB * RUN * HUNT * CATCH * LEVEL UP * </span></div></div>
+
+    <main id="main">
+      <section class="sec" id="heist" data-perch="sneak" data-still>
+        <div class="wrap">
+          <h2 data-reveal data-perch="sneak" data-say="Watch this">What happens in a heist?</h2>
+          <div class="tabs" role="tablist" aria-label="A heist, step by step">
+            <button class="btn" type="button" role="tab" id="t-scan" aria-controls="p-scan" aria-selected="true">Scan<i></i></button>
+            <button class="btn" type="button" role="tab" id="t-rob" aria-controls="p-rob" aria-selected="false" tabindex="-1">Rob<i></i></button>
+            <button class="btn" type="button" role="tab" id="t-run" aria-controls="p-run" aria-selected="false" tabindex="-1">Run<i></i></button>
+            <button class="btn" type="button" role="tab" id="t-hunt" aria-controls="p-hunt" aria-selected="false" tabindex="-1">Hunt<i></i></button>
+          </div>
+          <section class="moment" role="tabpanel" id="p-scan" aria-labelledby="t-scan">
+            <div class="moment-text frame panel" data-perch="hunt"><span class="coin" role="presentation"></span><h3>Find who is in earshot</h3><p>Your phone pings the room and everyone on patrol answers. You never see what they hold.</p></div>
+            <figure class="device" data-story="scan" data-perch="idle" role="img" aria-label="The scan screen: four players appear on the radar, one picked">
+              <span class="hw" aria-hidden="true"><i>9:41</i><u></u></span><div class="device-screen"><img class="poster" src="/screens/scan.png" alt="" width="390" height="844" loading="lazy" /><div class="device-live" inert></div></div>
+            </figure>
+          </section>
+          <section class="moment" role="tabpanel" id="p-rob" aria-labelledby="t-rob">
+            <div class="moment-text frame panel" data-perch="sneak"><h3>Sneak to their seat</h3><p>Their phone signs a ticket. You take 5 to 25% of their stake and post a bond of 20% of the loot.</p></div>
+            <figure class="device" data-story="rob" data-perch="thief" role="img" aria-label="The table, with your thief sneaking toward a seat">
+              <span class="hw" aria-hidden="true"><i>9:41</i><u></u></span><div class="device-screen"><img class="poster" src="/screens/sneak.png" alt="" width="390" height="844" loading="lazy" /><div class="device-live" inert></div></div>
+            </figure>
+          </section>
+          <section class="moment" role="tabpanel" id="p-run" aria-labelledby="t-run">
+            <div class="moment-text frame panel" data-perch="thief"><h3>10 seconds to vanish</h3><p>Then they find out. Stay out of range for 60 seconds and the loot is yours.</p></div>
+            <figure class="device" data-story="run" data-perch="alert" role="img" aria-label="Head start: a 10 second countdown over your thief running with the loot">
+              <span class="hw" aria-hidden="true"><i>9:41</i><u></u></span><div class="device-screen"><img class="poster" src="/screens/run.png" alt="" width="390" height="844" loading="lazy" /><div class="device-live" inert></div></div>
+            </figure>
+          </section>
+          <section class="moment" role="tabpanel" id="p-hunt" aria-labelledby="t-hunt">
+            <div class="moment-text frame panel" data-perch="alert"><h3>Or get hunted</h3><p>Your victim pulses a radar and closes in. If they catch you, they win your bond.</p></div>
+            <figure class="device" data-story="hunted" data-perch="caught" role="img" aria-label="Hunted: your victim chasing you with a sonar, the timer running down">
+              <span class="hw" aria-hidden="true"><i>9:41</i><u></u></span><div class="device-screen"><img class="poster" src="/screens/hunted.png" alt="" width="390" height="844" loading="lazy" /><div class="device-live" inert></div></div>
+            </figure>
+          </section>
         </div>
       </section>
 
-      <section class="torn">
-        <div class="torn-sheet"><div class="container split-pair">
-          <div class="pair-text">
-            <h2>What if someone robs you?</h2>
+      <section class="sec robbed" data-perch="alert" data-still>
+        <div class="wrap robbed-grid">
+          <div>
+            <h2 data-reveal data-perch="cry" data-say="My stake!">What if someone robs you?</h2>
             <p class="lead">Your phone sounds the alarm. You get one minute to walk them down.</p>
           </div>
           <figure class="shot">
-            <div class="phone" data-slot="robbed" data-kind="product" data-alt="The You were robbed screen"><img src="screens/alert.png" alt="The moment you are robbed" width="390" height="844" loading="lazy" /></div>
+            <div class="device" data-story="robbed" data-perch="alert" data-say="Thief!" role="img" aria-label="The moment you are robbed, then the hunt radar">
+              <span class="hw" aria-hidden="true"><i>9:41</i><u></u></span><div class="device-screen"><img class="poster" src="/screens/alert.png" alt="" width="390" height="844" loading="lazy" /><div class="device-live" inert></div></div>
+            </div>
             <figcaption>The second they get away</figcaption>
           </figure>
           <figure class="shot">
-            <div class="phone" data-slot="saved" data-kind="product" data-alt="The Caught them screen"><img src="screens/saved.png" alt="Caught them: your stake back plus their bond" width="390" height="844" loading="lazy" /></div>
+            <div class="device" data-story="saved" data-perch="saved" data-say="Got you!" role="img" aria-label="Caught them: your stake back plus their bond">
+              <span class="hw" aria-hidden="true"><i>9:41</i><u></u></span><div class="device-screen"><img class="poster" src="/screens/saved.png" alt="" width="390" height="844" loading="lazy" /><div class="device-live" inert></div></div>
+            </div>
             <figcaption>Catch them: your stake back, plus their bond</figcaption>
           </figure>
-        </div></div>
+        </div>
       </section>
 
-      <section class="q">
-        <div class="container">
-          <h2>Who do you play as?</h2>
+      <div class="strip run-stage" aria-hidden="true" data-perch="run" data-still>
+        <div class="run-wall"></div>
+        <div class="run-floor"></div>
+        <img class="runner" src="/sprites/nib/lv2/run.svg" alt="" style="top:60px" />
+        <img class="runner" src="/sprites/juno/lv1/run.svg" alt="" style="top:92px" />
+        <img class="runner" src="/sprites/rocco/lv2/thief-run.svg" alt="" style="top:70px" />
+      </div>
+
+      <section class="sec cast-sec" data-perch="idle" data-still>
+        <div class="wrap">
+          <h2 data-reveal data-perch="swag" data-say="Pick me">Who do you play as?</h2>
+          <p class="lead">Pick one. It follows you down the page and takes over every phone here.</p>
           <ul class="cast">
-            <li><img src="sprites/juno/lv1/idle.svg" alt="" width="240" height="240" loading="lazy" /><h3>Juno</h3><p>Hears everything. Those headphones are earned, not bought.</p></li>
-            <li><img src="sprites/rocco/lv1/idle.svg" alt="" width="240" height="240" loading="lazy" /><h3>Rocco</h3><p>Born with the mask. Has never paid for a snack.</p></li>
-            <li><img src="sprites/nib/lv1/idle.svg" alt="" width="240" height="240" loading="lazy" /><h3>Nib</h3><p>Tiny wings, huge appetite for anything shiny.</p></li>
+            <li><button class="btn pick" type="button" data-avatar="juno" aria-pressed="false" data-perch="idle"><span class="coin" role="presentation"></span><img src="/sprites/juno/lv1/idle.svg" alt="" width="240" height="240" loading="lazy" /><h3>Juno</h3><p>Hears everything. Those headphones are earned, not bought.</p></button></li>
+            <li><button class="btn pick pressed" type="button" data-avatar="rocco" aria-pressed="true" data-perch="thief"><img src="/sprites/rocco/lv1/idle.svg" alt="" width="240" height="240" loading="lazy" /><h3>Rocco</h3><p>Born with the mask. Has never paid for a snack.</p></button></li>
+            <li><button class="btn pick" type="button" data-avatar="nib" aria-pressed="false" data-perch="saved"><span class="coin" role="presentation"></span><img src="/sprites/nib/lv1/idle.svg" alt="" width="240" height="240" loading="lazy" /><h3>Nib</h3><p>Tiny wings, huge appetite for anything shiny.</p></button></li>
           </ul>
           <p class="cast-foot">Every theft and save levels your thief up.</p>
           <ol class="levels">
-            <li><img src="sprites/nib/lv1/idle.svg" alt="Nib at level 1" width="160" height="160" loading="lazy" />Rookie</li>
-            <li><img src="sprites/nib/lv2/idle.svg" alt="Nib at level 2, in a scarf with small wings" width="160" height="160" loading="lazy" />Prowler</li>
-            <li><img src="sprites/nib/lv3/idle.svg" alt="Nib at level 3, in gold armour and a crown" width="160" height="160" loading="lazy" />Phantom</li>
+            <li data-perch="idle"><img src="/sprites/rocco/lv1/idle.svg" alt="Rocco at level 1" width="160" height="160" loading="lazy" />Rookie</li>
+            <li data-perch="swag"><img src="/sprites/rocco/lv2/idle.svg" alt="Rocco at level 2" width="160" height="160" loading="lazy" />Prowler</li>
+            <li data-perch="saved"><img src="/sprites/rocco/lv3/idle.svg" alt="Rocco at level 3" width="160" height="160" loading="lazy" />Phantom</li>
           </ol>
         </div>
       </section>
 
-      <section class="q" id="faq">
-        <div class="container rows-wrap">
-          <h2>What do you need?</h2>
+      <section class="sec" id="faq" data-perch="hunt" data-still>
+        <div class="wrap rows-wrap">
+          <h2 data-reveal data-perch="hunt">What do you need?</h2>
           <dl class="rows">
-            <div><dt>An Android phone</dt><dd>There is no iPhone download yet. Ask the team for an Expo Go invite.</dd></div>
-            <div><dt>Your microphone</dt><dd>It only decodes game signals. Nothing is recorded, stored or uploaded.</dd></div>
-            <div><dt>Friends in the room</dt><dd>Phones find each other by sound, so a heist only works within earshot.</dd></div>
-            <div><dt>No real money</dt><dd>It runs on the Base Sepolia testnet. Every stake is free test ETH.</dd></div>
+            <div class="frame panel" data-perch="hunt"><span class="coin" role="presentation"></span><dt>An Android phone</dt><dd>There is no iPhone download yet. Ask the team for an Expo Go invite.</dd></div>
+            <div class="frame panel"><dt>Your microphone</dt><dd>It only decodes game signals. Nothing is recorded, stored or uploaded.</dd></div>
+            <div class="frame panel" data-perch="saved"><span class="coin" role="presentation"></span><dt>Friends in the room</dt><dd>Phones find each other by sound, so a heist only works within earshot.</dd></div>
+            <div class="frame panel"><dt>No real money</dt><dd>It runs on the Base Sepolia testnet. Every stake is free test ETH.</dd></div>
           </dl>
         </div>
       </section>
 
-      <section class="q" id="install">
-        <div class="container">
-          <h2>How do you install it?</h2>
-          <p class="lead">Android checks before installing apps from outside the Play Store. Check <a class="text-link" href="#faq">what you need</a> first.</p>
+      <section class="sec mood-mint-sec" id="install" data-perch="saved" data-still>
+        <div class="wrap">
+          <h2 data-reveal data-perch="saved">How do you install it?</h2>
+          <p class="lead">Android checks before installing apps from outside the Play Store. Check <a class="link" href="#faq">what you need</a> first.</p>
           <ol class="steps">
-            <li><h3>Download</h3><p>Tap Download on your phone. If Chrome warns about APK files, tap Download anyway.</p></li>
-            <li><h3>Allow this source</h3><p>Open the file. When Android asks, allow installs from your browser, then go back.</p></li>
-            <li><h3>Install and play</h3><p>Tap Install, open Sonic Heist and allow the microphone.</p></li>
+            <li class="frame panel" data-perch="idle"><span class="coin" role="presentation"></span><h3>Download</h3><p>Tap Download on your phone. If Chrome warns about APK files, tap Download anyway.</p></li>
+            <li class="frame panel" data-perch="sneak"><span class="coin" role="presentation"></span><h3>Allow this source</h3><p>Open the file. When Android asks, allow installs from your browser, then go back.</p></li>
+            <li class="frame panel" data-perch="swag"><span class="coin" role="presentation"></span><h3>Install and play</h3><p>Tap Install, open Sonic Heist and allow the microphone.</p></li>
           </ol>
         </div>
       </section>
 
-      <section class="q close">
-        <div class="container close-grid">
+      <section class="sec close" data-perch="swag" data-still>
+        <div class="wrap close-grid">
           <div>
-            <h2>Ready to sneak up on someone?</h2>
-            <div class="actions"><a class="btn btn--primary" href="/sonic-heist.apk" download>Download for Android</a></div>
+            <h2 data-reveal data-perch="swag" data-say="Your turn">Ready to sneak up on someone?</h2>
+            <div class="actions"><a class="btn red big get" href="/sonic-heist.apk" download data-perch="thief"><span class="coin" role="presentation"></span>Download for Android</a></div>
           </div>
-          <figure class="phone sheet tilt-r" data-slot="won" data-kind="product" data-alt="The You got away screen">
-            <img src="screens/won.png" alt="You got away: your thief in a gold chain and shades" width="390" height="844" loading="lazy" />
+          <figure class="device" data-story="won" data-perch="swag" role="img" aria-label="You got away: your thief in a gold chain and shades">
+            <span class="hw" aria-hidden="true"><i>9:41</i><u></u></span><div class="device-screen"><img class="poster" src="/screens/won.png" alt="" width="390" height="844" loading="lazy" /><div class="device-live" inert></div></div>
           </figure>
         </div>
       </section>
     </main>
 
-    <footer class="footer container">
-      <p>Sonic Heist is played on the Base Sepolia testnet, so no real money changes hands. Screens are from the game’s test build. Game contract <a href="https://base-sepolia.blockscout.com/address/0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA" title="0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA">0xb8C5…5FFA</a>.</p>
+    <footer class="footer" data-perch="cry" data-still>
+      <p class="wrap">Sonic Heist is played on the Base Sepolia testnet, so no real money changes hands. Screens run the game’s test build. Game contract <a class="link" href="https://base-sepolia.blockscout.com/address/0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA" title="0xb8C5C57Ea8FD00966308fE34D170b3e9E4Ba5FFA">0xb8C5…5FFA</a>.</p>
     </footer>
 
-    <script>
-      // Switcher: without this script every moment shows in order.
-      document.querySelectorAll('[data-switch]').forEach((root) => {
-        const tabs = [...root.querySelectorAll('[role="tab"]')];
-        const show = (tab) => tabs.forEach((t) => {
-          const on = t === tab;
-          t.setAttribute('aria-selected', on);
-          t.tabIndex = on ? 0 : -1;
-          document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
-        });
-        tabs.forEach((t, i) => {
-          t.addEventListener('click', () => show(t));
-          t.addEventListener('keydown', (e) => {
-            const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-            if (!d) return;
-            const next = tabs[(i + d + tabs.length) % tabs.length];
-            show(next);
-            next.focus();
-          });
-        });
-        show(tabs[0]);
-      });
-    </script>
-    <script>window.hallmarkSlots = (m) => { for (const [k, v] of Object.entries(m)) { const s = document.querySelector(`[data-slot="${k}"]`); if (!s) continue; const im = new Image(); im.src = typeof v === 'string' ? v : v.src; im.alt = (typeof v === 'object' && v.alt) || s.dataset.alt || ''; s.querySelectorAll(':scope > img').forEach((o) => o.remove()); s.prepend(im); } };
-document.querySelectorAll('[data-slot] img').forEach((i) => { if (i.complete && !i.naturalWidth) i.remove(); else i.addEventListener('error', () => i.remove(), { once: true }); });</script>
+    <script type="module" src="./src/main.js"></script>
   </body>
 </html>

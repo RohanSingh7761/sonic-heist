@@ -52,6 +52,7 @@ export interface GameState {
   wallet: number;
   thefts: number;
   saves: number;
+  losses: number;
   micOk: boolean;
   soundOk: boolean;
   soundOn: boolean;
@@ -111,15 +112,15 @@ export const initialState = (name: string): GameState => {
   const entries = savedLog();
   const micOk = typeof window !== 'undefined' && localStorage.getItem('sonic_mic_ok') === 'true';
   const soundOk = typeof window !== 'undefined' && localStorage.getItem('sonic_sound_ok') === 'true';
-  const ready = micOk && soundOk;
   return {
-    view: ready ? 'table' : 'setup',
+    view: 'title', // Title's Start button routes to setup or table from micOk/soundOk.
     avatar: 'rocco',
     name,
     stake: 0,
     wallet: 0.3,
     thefts: 0,
     saves: 0,
+    losses: 0,
     micOk,
     soundOk,
     soundOn: true,
@@ -169,6 +170,7 @@ export type Action =
   | { type: 'setBalances'; wallet: number; stake: number; immuneUntil: number; readyAt: number }
   | { type: 'setUser'; name: string; walletAddress: string; privateKey: string }
   | { type: 'addWin' }
+  | { type: 'setStats'; thefts: number; saves: number; losses: number }
   | { type: 'logEvent'; kind: LogEntry['kind']; text: string; at: number }
   | { type: 'clearLog' }
   | { type: 'tick'; now: number }
@@ -225,7 +227,7 @@ function step(s: GameState, h: Heist, at: number): GameState {
 
 function lost(s: GameState, h: Heist): GameState {
   const at = h.deadline ?? 0;
-  return log({ ...s, immuneUntil: at + IMMUNITY, heist: { ...h, phase: 'lost', phaseEnds: null } }, 'bad', `${h.rival.name} got away with ${eth(h.amount)}`, at);
+  return log({ ...s, losses: s.losses + 1, immuneUntil: at + IMMUNITY, heist: { ...h, phase: 'lost', phaseEnds: null } }, 'bad', `${h.rival.name} got away with ${eth(h.amount)}`, at);
 }
 
 function advance(s: GameState, now: number): GameState {
@@ -355,8 +357,8 @@ export function reduce(s: GameState, a: Action): GameState {
       if (h?.phase !== 'hunting' || !h.inRange) return s;
       return { ...s, heist: { ...h, phase: 'handshake', phaseEnds: a.now + HANDSHAKE_TIME } };
     case 'victimFoundMe':
-      if (!h || h.role !== 'thief') return s;
-      return log({ ...s, readyAt: a.now + COOLDOWN, heist: { ...h, phase: 'caught', phaseEnds: null } }, 'bad', `${h.rival.name} caught you. Bond of ${eth(h.bond)} lost`, a.now);
+      if (!h || h.role !== 'thief' || h.phase === 'caught') return s;
+      return log({ ...s, losses: s.losses + 1, readyAt: a.now + COOLDOWN, heist: { ...h, phase: 'caught', phaseEnds: null } }, 'bad', `${h.rival.name} caught you. Bond of ${eth(h.bond)} lost`, a.now);
     case 'claim': {
       if (h?.phase !== 'won') return s;
       const claimed = { ...s, stake: s.stake + h.amount + h.bond, readyAt: (h.deadline ?? 0) + COOLDOWN, heist: null };
@@ -375,6 +377,8 @@ export function reduce(s: GameState, a: Action): GameState {
       return { ...s, name: a.name, walletAddress: a.walletAddress, privateKey: a.privateKey };
     case 'addWin':
       return addWin(s, 'thefts');
+    case 'setStats':
+      return { ...s, thefts: a.thefts, saves: a.saves, losses: a.losses };
     case 'logEvent':
       return log(s, a.kind, a.text, a.at);
     case 'clearLog':

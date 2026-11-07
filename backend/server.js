@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { verifyMessage } from 'viem';
 import crypto from 'crypto';
 import { pool, initDb } from './src/db.js';
 
@@ -95,6 +96,45 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Failed to log in' });
+  }
+});
+
+// 4. Win/loss record, which sets each player's level. Must match statsMessage in apps/web/src/ui/UiApp.tsx.
+const statsMessage = (address, thefts, saves, losses) => `Sonic Heist stats ${address.toLowerCase()} ${thefts} ${saves} ${losses}`;
+const STAT_COLUMNS = 'thefts, saves, losses';
+
+app.get('/api/stats/:address', async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT ${STAT_COLUMNS} FROM users WHERE lower(wallet_address) = lower($1)`, [req.params.address]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Unknown wallet' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Stats read error:', err);
+    res.status(500).json({ error: 'Failed to read stats' });
+  }
+});
+
+// Takes running totals signed by the player's wallet. Totals only ever go up, so a replayed or stale save changes nothing.
+app.post('/api/stats', async (req, res) => {
+  const { address, thefts, saves, losses, signature } = req.body ?? {};
+  const counts = [thefts, saves, losses];
+  if (typeof address !== 'string' || typeof signature !== 'string' || !counts.every((n) => Number.isInteger(n) && n >= 0 && n < 1e6)) {
+    return res.status(400).json({ error: 'address, signature and whole-number thefts, saves and losses are required' });
+  }
+  try {
+    const found = await pool.query('SELECT wallet_address FROM users WHERE lower(wallet_address) = lower($1)', [address]);
+    if (found.rows.length === 0) return res.status(404).json({ error: 'Unknown wallet' });
+    const ok = await verifyMessage({ address: found.rows[0].wallet_address, message: statsMessage(address, thefts, saves, losses), signature }).catch(() => false);
+    if (!ok) return res.status(401).json({ error: 'Bad signature' });
+    const result = await pool.query(
+      `UPDATE users SET thefts = GREATEST(thefts, $2), saves = GREATEST(saves, $3), losses = GREATEST(losses, $4)
+       WHERE lower(wallet_address) = lower($1) RETURNING ${STAT_COLUMNS}`,
+      [address, thefts, saves, losses]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Stats save error:', err);
+    res.status(500).json({ error: 'Failed to save stats' });
   }
 });
 

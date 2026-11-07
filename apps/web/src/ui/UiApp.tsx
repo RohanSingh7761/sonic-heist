@@ -26,6 +26,7 @@ import {
   encodeCaught,
 } from '../protocol/codecs';
 import { bytesToHex, getPlayerName } from '../protocol/signatures';
+import { privateKeyToAccount } from 'viem/accounts';
 import {
   fetchOnChainBalances,
   depositToVault,
@@ -66,6 +67,8 @@ const lootAction = (role: 'thief' | 'victim', loot: ChainLoot): Action => {
 
 const chainError = (err: any): string => err?.cause?.data?.errorName ?? err?.shortMessage ?? err?.message ?? 'Transaction failed';
 // Fuller than the toast: viem's details hold the node's own reason, like "insufficient funds for gas".
+// Must match statsMessage in backend/server.js, which checks the signature.
+const statsMessage = (address: string, thefts: number, saves: number, losses: number) => `Sonic Heist stats ${address.toLowerCase()} ${thefts} ${saves} ${losses}`;
 const errorDetail = (err: any): string => [chainError(err), err?.details].filter(Boolean).join(' | ');
 const uidHex = (uid: number) => uid.toString(16).toUpperCase().padStart(8, '0');
 
@@ -158,6 +161,36 @@ export function UiApp() {
       // Storage full or blocked: the log still works until the next refresh.
     }
   }, [s.log]);
+
+  // Wins and losses live on the backend per account. `synced` is the last totals the server has; null until they load, so a fresh 0/0/0 never gets saved over them.
+  const synced = useRef<string | null>(null);
+  useEffect(() => {
+    synced.current = null;
+    if (!currentUser.privateKey) return;
+    fetch(`/api/stats/${currentUser.walletAddress}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((st) => {
+        synced.current = `${st.thefts},${st.saves},${st.losses}`;
+        send({ type: 'setStats', thefts: st.thefts, saves: st.saves, losses: st.losses });
+      })
+      .catch((e) => logEvent('bad', `Could not load your wins and losses: ${errorDetail(e)}`));
+  }, [currentUser.walletAddress]);
+
+  useEffect(() => {
+    const totals = `${s.thefts},${s.saves},${s.losses}`;
+    if (synced.current === null || synced.current === totals || !currentUser.privateKey) return;
+    synced.current = totals;
+    const address = currentUser.walletAddress;
+    privateKeyToAccount(currentUser.privateKey)
+      .signMessage({ message: statsMessage(address, s.thefts, s.saves, s.losses) })
+      .then((signature) => fetch('/api/stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, thefts: s.thefts, saves: s.saves, losses: s.losses, signature }),
+      }))
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); })
+      .catch((e) => logEvent('bad', `Could not save your wins and losses: ${errorDetail(e)}`));
+  }, [s.thefts, s.saves, s.losses]);
 
   // Anything nothing else caught still reaches the log, and so does anything on-chain.
   useEffect(() => {
@@ -692,7 +725,7 @@ export function UiApp() {
       <DemoControls {...p} />
 
       {/* Requirement 2: Login / Signup Modal */}
-      {showAuthModal && (
+      {showAuthModal && s.view !== 'title' && (
         <AuthModal
           onSuccess={(u) => {
             const cleanUid = parseInt(u.walletAddress.slice(2, 10), 16) >>> 0;

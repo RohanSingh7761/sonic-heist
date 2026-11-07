@@ -1,9 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { UiApp } from './ui/UiApp';
-import './ui/pixel.css';
 import App from './App';
-import './index.css';
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: any) {
@@ -44,6 +42,8 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 const isLegacy = typeof window !== 'undefined' && window.location.search.includes('legacy=1');
+// Each app gets only its own stylesheet: the legacy one turns all text white, which hid the game's headings.
+if (isLegacy) import('./index.css'); else import('./ui/pixel.css');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -118,7 +118,7 @@ export function AuthModal({ onSuccess }: Props) {
           <button
             type="button"
             onClick={() => { setIsLogin(!isLogin); setError(null); }}
-            style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }}
+            style={{ background: 'none', border: 'none', color: 'var(--red-dark)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 18, textDecoration: 'underline' }}
           >
             {isLogin ? "Need an account? Sign Up" : 'Already have an account? Log In'}
           </button>
