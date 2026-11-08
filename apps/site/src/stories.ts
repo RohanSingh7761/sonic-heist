@@ -63,13 +63,14 @@ export const STORIES: Record<string, Story> = {
     end: 10000,
   },
   robbed: {
-    setup: (s) => s,
-    steps: [[500, incoming], [5500, () => ({ type: 'pulse' })], [6700, () => ({ type: 'pulse' })], [7900, () => ({ type: 'pulse' })], [8300, inRange]],
+    // Robbed a head start ago, so the phone skips the quiet alarm and shows the alert at 500 ms.
+    setup: (s, now) => apply(s, incoming(now - HEAD_START + 500)),
+    steps: [[5500, () => ({ type: 'pulse' })], [6700, () => ({ type: 'pulse' })], [7900, () => ({ type: 'pulse' })], [8300, inRange]],
     end: 10000,
   },
   // The catch: the victim's cancel lands on-chain, which the real game reports as a finished handshake.
   saved: {
-    setup: (s, now) => apply(s, incoming(now - 4500), { type: 'tick', now }, { type: 'pulse' }, { type: 'pulse' }, { type: 'pulse' }, inRange()),
+    setup: (s, now) => apply(s, incoming(now - HEAD_START - 4500), { type: 'tick', now }, { type: 'pulse' }, { type: 'pulse' }, { type: 'pulse' }, inRange()),
     steps: [[1600, (now) => ({ type: 'cancel', now })], [3600, () => ({ type: 'caughtHandshake' })]],
     end: 11000,
   },
