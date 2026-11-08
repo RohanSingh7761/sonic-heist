@@ -17,7 +17,9 @@ export default defineConfig({
         display: 'standalone'
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,wasm}']
+        globPatterns: ['**/*.{js,css,html,wasm,svg,wav,woff2}'],
+        // Preview pages and scenes no screen uses: not worth downloading to every phone.
+        globIgnores: ['sprites/index.html', 'sfx/index.html', 'scenarios/**', 'sprites/scenes/{table-idle,heist-thief-view,run-all}.svg']
       }
     })
   ],

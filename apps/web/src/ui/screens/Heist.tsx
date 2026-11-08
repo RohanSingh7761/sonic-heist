@@ -66,11 +66,40 @@ function Running({ s, h, now }: Props) {
           ...(headstart ? [] : [{ avatar: h.rival.avatar, level: h.rival.level, state: 'hunt' as const, x: -62, y: 50, label: 'Your victim, hunting you' }]),
         ]} />
       </div>
-      <p style={{ padding: '0 20px' }}>{headstart ? "They find out when this hits zero. Get out of range." : 'Stay out of sound range until the timer runs out.'}</p>
+      <p style={{ padding: '0 20px' }}>{headstart ? "Everyone is running now, so blend in. Your victim finds out when this hits zero." : 'Stay out of sound range until the timer runs out.'}</p>
       <div className="grow" />
       <div className="frame panel" style={{ margin: '0 19px 20px' }}>
         <div className="spread"><span>Loot <b>{fmtEth(h.amount)} ETH</b></span><span>Bond <b>{fmtEth(h.bond)}</b></span></div>
       </div>
+    </main>
+  );
+}
+
+// Bystanders see this, and so does the victim until the reveal: no phone gives away who was robbed.
+// Everyone hears the same alarm at the same moment, including the thief. No names, and no bundle on any runner.
+export function Alarm({ s, ends, now }: { s: GameState; ends: number; now: number }) {
+  const level = levelFor(s.thefts + s.saves);
+  useEffect(() => { sfx('alert'); if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]); }, []);
+  useLoop(s.soundOn ? 'run-loop' : null, 0.5);
+  useLoop(s.soundOn ? 'footsteps-loop' : null, 0.4);
+  const cast = MOCK_PLAYERS.slice(0, 4);
+  return (
+    <main className="screen center mood-red" style={{ padding: 0 }}>
+      <div className="grow" />
+      <h1 className="title" style={{ fontSize: 50, padding: '0 16px' }}>A stake was stolen!</h1>
+      <div className="heading">Everyone run!</div>
+      <div className="timer" role="timer">{fmtTime(ends - now)}</div>
+      <div style={{ width: '100%', margin: '10px 0' }}>
+        <RunStage runners={[
+          { avatar: s.avatar, level, state: 'run', x: 64, y: 56, label: 'You' },
+          { avatar: cast[0].avatar, level: cast[0].level, state: 'run', x: 30, y: 44 },
+          { avatar: cast[1].avatar, level: cast[1].level, state: 'run', x: -4, y: 62 },
+          { avatar: cast[2].avatar, level: cast[2].level, state: 'run', x: -36, y: 46 },
+          { avatar: cast[3].avatar, level: cast[3].level, state: 'run', x: -64, y: 62 },
+        ]} />
+      </div>
+      <p style={{ padding: '0 20px' }}>The thief is one of you. Keep moving until the timer ends, so nobody can tell who.</p>
+      <div className="grow" />
     </main>
   );
 }
@@ -256,6 +285,8 @@ export function HeistScreen(p: Props) {
       return <Won {...p} />;
     case 'caught':
       return <Caught {...p} />;
+    case 'alarm':
+      return <Alarm s={p.s} ends={p.h.deadline as number} now={p.now} />;
     case 'alert':
       return <Alert {...p} />;
     case 'hunting':

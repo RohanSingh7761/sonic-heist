@@ -14,6 +14,7 @@ export type SfxName = (typeof SFX_NAMES)[number];
 
 class SoundFX {
   private ctx: AudioContext | null = null;
+  private bytes = new Map<SfxName, Promise<ArrayBuffer>>();
   private buffers = new Map<SfxName, Promise<AudioBuffer>>();
 
   private getContext(): AudioContext {
@@ -27,25 +28,36 @@ class SoundFX {
     return this.ctx;
   }
 
+  private fetchBytes(name: SfxName, priority: RequestPriority = 'auto'): Promise<ArrayBuffer> {
+    let bytes = this.bytes.get(name);
+    if (!bytes) {
+      bytes = fetch(`sfx/${name}.wav`, { priority }).then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.arrayBuffer();
+      });
+      // Let a failed download (e.g. a network blip) retry on the next play.
+      bytes.catch(() => this.bytes.delete(name));
+      this.bytes.set(name, bytes);
+    }
+    return bytes;
+  }
+
   private load(name: SfxName): Promise<AudioBuffer> {
     let buffer = this.buffers.get(name);
     if (!buffer) {
-      buffer = fetch(`sfx/${name}.wav`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.arrayBuffer();
-        })
-        .then((bytes) => this.getContext().decodeAudioData(bytes));
-      // Let a failed download (e.g. a network blip) retry on the next play.
-      buffer.catch(() => this.buffers.delete(name));
+      buffer = this.fetchBytes(name).then((bytes) => this.getContext().decodeAudioData(bytes));
+      buffer.catch(() => {
+        this.buffers.delete(name);
+        this.bytes.delete(name); // decoding consumes the bytes, so a retry needs a fresh copy
+      });
       this.buffers.set(name, buffer);
     }
     return buffer;
   }
 
-  // Fetch everything ahead of time so the first play of a sound has no delay.
+  // Download everything ahead of time, at low priority. Needs no tap: audio only starts on the first play.
   preload() {
-    SFX_NAMES.forEach((name) => this.load(name).catch(() => {}));
+    SFX_NAMES.forEach((name) => this.fetchBytes(name, 'low').catch(() => {}));
   }
 
   // Sound problems must never break the game, so failures only warn. Returns a function that stops the sound.

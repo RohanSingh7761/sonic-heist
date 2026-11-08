@@ -5,7 +5,7 @@ export type AvatarId = 'juno' | 'rocco' | 'nib';
 export type Level = 1 | 2 | 3;
 export type View = 'title' | 'pick' | 'setup' | 'round' | 'table' | 'scan' | 'levels' | 'log' | 'settings';
 export type ThiefPhase = 'ticket' | 'grab' | 'disguise' | 'headstart' | 'hunted' | 'won' | 'caught';
-export type VictimPhase = 'alert' | 'hunting' | 'handshake' | 'saved' | 'lost';
+export type VictimPhase = 'alarm' | 'alert' | 'hunting' | 'handshake' | 'saved' | 'lost';
 export type Phase = ThiefPhase | VictimPhase;
 
 export interface Player {
@@ -67,6 +67,8 @@ export interface GameState {
   heist: Heist | null;
   levelUpTo: Level | null;
   notice: string | null;
+  noticeGood: boolean;
+  alarm: { ends: number } | null; // someone else's stake was stolen: everyone runs, so the thief doesn't stand out
   log: LogEntry[];
   logSeq: number;
 }
@@ -83,6 +85,7 @@ export const SCAN_TIME = 10_000;
 export const TICKET_TIME = 15_000;
 export const DISGUISE_TIME = 1_600;
 export const HANDSHAKE_TIME = 20_000;
+export const ALERT_TIME = 4_000;
 export const PULSES_TO_FIND = 1; // Immediate detection upon acoustic radar pulse
 
 // shortcut: placeholder thresholds, set the real numbers once the team decides them.
@@ -135,6 +138,8 @@ export const initialState = (name: string): GameState => {
     heist: null,
     levelUpTo: null,
     notice: null,
+    noticeGood: false,
+    alarm: null,
     log: entries,
     logSeq: entries[0]?.id ?? 0,
   };
@@ -159,6 +164,8 @@ export type Action =
   | { type: 'lootFailed'; message: string }
   | { type: 'lootResolved'; status: 'cancelled' | 'claimed'; now: number }
   | { type: 'incoming'; now: number; rival: Player; lootRate: number }
+  | { type: 'alarm'; now: number }
+  | { type: 'allClear'; now: number; caught: boolean }
   | { type: 'hunt' }
   | { type: 'pulse' }
   | { type: 'cancel'; now: number }
@@ -207,6 +214,9 @@ function step(s: GameState, h: Heist, at: number): GameState {
       return set({ phase: 'hunted', phaseEnds: h.deadline });
     case 'hunted':
       return set({ phase: 'won', phaseEnds: null });
+    case 'alarm':
+      // The reveal: until now the victim's phone looked like everyone else's, so the stake only drops here.
+      return log({ ...s, stake: s.stake - h.amount, heist: { ...h, phase: 'alert', phaseEnds: at + ALERT_TIME } }, 'bad', `${h.rival.name} robbed you of ${eth(h.amount)}`, at);
     case 'alert':
       return set({ phase: 'hunting', phaseEnds: h.deadline });
     case 'handshake':
@@ -230,8 +240,14 @@ function lost(s: GameState, h: Heist): GameState {
   return log({ ...s, losses: s.losses + 1, immuneUntil: at + IMMUNITY, heist: { ...h, phase: 'lost', phaseEnds: null } }, 'bad', `${h.rival.name} got away with ${eth(h.amount)}`, at);
 }
 
+function endAlarm(s: GameState, caught: boolean, at: number): GameState {
+  const text = caught ? 'All clear. The thief was caught.' : 'All clear. The thief got away.';
+  return log({ ...s, alarm: null, notice: text, noticeGood: true }, 'info', text, at);
+}
+
 function advance(s: GameState, now: number): GameState {
   let next = s;
+  if (next.alarm && now >= next.alarm.ends) next = endAlarm(next, false, next.alarm.ends);
   if (next.scanEnds !== null && now >= next.scanEnds) {
     const players = next.nearby;
     next = { ...next, scanEnds: null, nearby: players };
@@ -320,7 +336,7 @@ export function reduce(s: GameState, a: Action): GameState {
       return { ...s, target: a.uid };
     case 'rob': {
       const rival = s.nearby.find((p) => p.uid === s.target);
-      if (!rival || h) return s;
+      if (!rival || h || s.alarm) return s;
       if (a.now < s.readyAt) return { ...s, notice: 'Still on cooldown.' };
       // The contract picks the amount when the loot starts.
       return {
@@ -330,22 +346,20 @@ export function reduce(s: GameState, a: Action): GameState {
       };
     }
     case 'incoming': {
-      if (h) return { ...s, notice: 'Already in a heist.' };
+      if (h || s.alarm) return { ...s, notice: 'Already in a heist.' };
       if (!s.patrol || s.shield) return { ...s, notice: 'Patrol must be on and shield off to be robbed.' };
       if (a.now < s.immuneUntil) return { ...s, notice: 'You are immune right now.' };
       const amount = s.stake * a.lootRate;
       if (amount < MIN_LOOT) return { ...s, notice: 'Your stake is too small to loot.' };
-      return log(
-        {
-          ...s,
-          stake: s.stake - amount,
-          heist: { role: 'victim', phase: 'alert', rival: a.rival, amount, bond: amount * BOND_RATE, phaseEnds: a.now + 4_000, deadline: a.now + HUNT_WINDOW, pulses: 0, signal: 0, inRange: false },
-        },
-        'bad',
-        `${a.rival.name} robbed you of ${eth(amount)}`,
-        a.now,
-      );
+      return {
+        ...s,
+        heist: { role: 'victim', phase: 'alarm', rival: a.rival, amount, bond: amount * BOND_RATE, phaseEnds: a.now + HEAD_START, deadline: a.now + HEAD_START + HUNT_WINDOW, pulses: 0, signal: 0, inRange: false },
+      };
     }
+    case 'alarm':
+      return h || s.alarm ? s : { ...s, alarm: { ends: a.now + HEAD_START + HUNT_WINDOW } };
+    case 'allClear':
+      return s.alarm ? endAlarm(s, a.caught, a.now) : s;
     case 'hunt':
       return h?.phase === 'alert' ? { ...s, heist: { ...h, phase: 'hunting', phaseEnds: h.deadline } } : s;
     case 'pulse': {
@@ -367,7 +381,7 @@ export function reduce(s: GameState, a: Action): GameState {
     case 'dismiss':
       return h && (h.phase === 'caught' || h.phase === 'saved' || h.phase === 'lost') ? { ...s, heist: null } : s;
     case 'clearNotice':
-      return { ...s, notice: null };
+      return { ...s, notice: null, noticeGood: false };
     case 'clearLevelUp':
       return { ...s, levelUpTo: null };
     case 'setBalances':
@@ -387,11 +401,12 @@ export function reduce(s: GameState, a: Action): GameState {
       return advance(s, a.now);
     case 'skip':
       // Demo control: jump to the end of the current timer.
+      if (s.alarm) return advance({ ...s, alarm: { ends: a.now } }, a.now);
       if (s.scanEnds !== null) return advance(s, s.scanEnds);
       if (h?.phaseEnds == null) return s;
       {
         // The deadline counts on from these phases, so it must move forward with the skip.
-        const shiftsDeadline = h.deadline !== null && (h.phase === 'headstart' || h.phase === 'hunted' || h.phase === 'hunting');
+        const shiftsDeadline = h.deadline !== null && (h.phase === 'alarm' || h.phase === 'headstart' || h.phase === 'hunted' || h.phase === 'hunting');
         const skipped = h.phaseEnds - a.now;
         return advance({ ...s, heist: { ...h, phaseEnds: a.now, deadline: shiftsDeadline ? (h.deadline as number) - skipped : h.deadline } }, a.now);
       }

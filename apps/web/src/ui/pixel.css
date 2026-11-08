@@ -1,3 +1,9 @@
+@font-face {
+  font-family: 'Jersey 15';
+  src: url(/fonts/jersey15-latin.woff2) format('woff2');
+  font-display: swap;
+}
+
 :root {
   --cream: #fff4e4;
   --paper: #fffaf1;

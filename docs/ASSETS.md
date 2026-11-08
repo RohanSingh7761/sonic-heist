@@ -33,7 +33,7 @@ Every avatar has all of these at every level.
 | `seated` | Sitting on a chair at the table | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
 | `sneak` | Tiptoeing and looking side to side | `heist.ticket`, `heist.grab` |
 | `thief` | Standing with black glasses, stick and black bundle | `screen.pick`, `heist.disguise` |
-| `run` | Plain run, facing right | `screen.title`, `screen.round` |
+| `run` | Plain run, facing right | `screen.title`, `screen.round`, `heist.alarm` |
 | `thief-run` | Running with glasses and bundle, facing right | `screen.title`, `heist.headstart`, `heist.hunted` |
 | `swag` | Shades drop, gold chain, coins raining | `screen.pick`, `heist.won` |
 | `cry` | Tears, flying drops, growing puddle | `screen.pick`, `heist.lost` |
@@ -47,188 +47,188 @@ Every avatar has all of these at every level.
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.juno.lv1.idle` | `idle` | `/sprites/juno/lv1/idle.svg` | 48x48 | 11 | 3.64 s | 16.2 KB |
-| `avatar.juno.lv1.seated` | `seated` | `/sprites/juno/lv1/seated.svg` | 48x48 | 7 | 3.03 s | 20.4 KB |
-| `avatar.juno.lv1.sneak` | `sneak` | `/sprites/juno/lv1/sneak.svg` | 48x48 | 8 | 1.52 s | 21.1 KB |
-| `avatar.juno.lv1.thief` | `thief` | `/sprites/juno/lv1/thief.svg` | 48x48 | 7 | 1.96 s | 13.1 KB |
-| `avatar.juno.lv1.run` | `run` | `/sprites/juno/lv1/run.svg` | 48x48 | 4 | 0.44 s | 13.0 KB |
-| `avatar.juno.lv1.thief-run` | `thief-run` | `/sprites/juno/lv1/thief-run.svg` | 48x48 | 4 | 0.40 s | 17.9 KB |
-| `avatar.juno.lv1.swag` | `swag` | `/sprites/juno/lv1/swag.svg` | 48x48 | 15 | 2.85 s | 52.9 KB |
-| `avatar.juno.lv1.cry` | `cry` | `/sprites/juno/lv1/cry.svg` | 48x48 | 12 | 2.04 s | 42.5 KB |
-| `avatar.juno.lv1.caught` | `caught` | `/sprites/juno/lv1/caught.svg` | 48x48 | 8 | 1.20 s | 38.5 KB |
-| `avatar.juno.lv1.saved` | `saved` | `/sprites/juno/lv1/saved.svg` | 48x48 | 8 | 0.88 s | 32.1 KB |
-| `avatar.juno.lv1.alert` | `alert` | `/sprites/juno/lv1/alert.svg` | 48x48 | 8 | 0.88 s | 23.3 KB |
-| `avatar.juno.lv1.hunt` | `hunt` | `/sprites/juno/lv1/hunt.svg` | 48x48 | 8 | 1.36 s | 23.9 KB |
-| `avatar.juno.lv1.locked` | `locked` | `/sprites/juno/lv1/locked.svg` | 48x48 | 1 | Still | 3.5 KB |
+| `avatar.juno.lv1.idle` | `idle` | `/sprites/juno/lv1/idle.svg` | 48x48 | 11 | 3.64 s | 9.4 KB |
+| `avatar.juno.lv1.seated` | `seated` | `/sprites/juno/lv1/seated.svg` | 48x48 | 7 | 3.03 s | 10.0 KB |
+| `avatar.juno.lv1.sneak` | `sneak` | `/sprites/juno/lv1/sneak.svg` | 48x48 | 8 | 1.52 s | 14.2 KB |
+| `avatar.juno.lv1.thief` | `thief` | `/sprites/juno/lv1/thief.svg` | 48x48 | 7 | 1.96 s | 8.5 KB |
+| `avatar.juno.lv1.run` | `run` | `/sprites/juno/lv1/run.svg` | 48x48 | 4 | 0.44 s | 9.5 KB |
+| `avatar.juno.lv1.thief-run` | `thief-run` | `/sprites/juno/lv1/thief-run.svg` | 48x48 | 4 | 0.40 s | 12.2 KB |
+| `avatar.juno.lv1.swag` | `swag` | `/sprites/juno/lv1/swag.svg` | 48x48 | 15 | 2.85 s | 37.6 KB |
+| `avatar.juno.lv1.cry` | `cry` | `/sprites/juno/lv1/cry.svg` | 48x48 | 12 | 2.04 s | 25.5 KB |
+| `avatar.juno.lv1.caught` | `caught` | `/sprites/juno/lv1/caught.svg` | 48x48 | 8 | 1.20 s | 16.3 KB |
+| `avatar.juno.lv1.saved` | `saved` | `/sprites/juno/lv1/saved.svg` | 48x48 | 8 | 0.88 s | 23.5 KB |
+| `avatar.juno.lv1.alert` | `alert` | `/sprites/juno/lv1/alert.svg` | 48x48 | 8 | 0.88 s | 12.4 KB |
+| `avatar.juno.lv1.hunt` | `hunt` | `/sprites/juno/lv1/hunt.svg` | 48x48 | 8 | 1.36 s | 16.0 KB |
+| `avatar.juno.lv1.locked` | `locked` | `/sprites/juno/lv1/locked.svg` | 48x48 | 1 | Still | 2.5 KB |
 
 ## Juno, LV 2 Prowler
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.juno.lv2.idle` | `idle` | `/sprites/juno/lv2/idle.svg` | 48x48 | 11 | 3.64 s | 18.8 KB |
-| `avatar.juno.lv2.seated` | `seated` | `/sprites/juno/lv2/seated.svg` | 48x48 | 7 | 3.03 s | 23.0 KB |
-| `avatar.juno.lv2.sneak` | `sneak` | `/sprites/juno/lv2/sneak.svg` | 48x48 | 8 | 1.52 s | 24.7 KB |
-| `avatar.juno.lv2.thief` | `thief` | `/sprites/juno/lv2/thief.svg` | 48x48 | 7 | 1.96 s | 13.8 KB |
-| `avatar.juno.lv2.run` | `run` | `/sprites/juno/lv2/run.svg` | 48x48 | 4 | 0.44 s | 15.1 KB |
-| `avatar.juno.lv2.thief-run` | `thief-run` | `/sprites/juno/lv2/thief-run.svg` | 48x48 | 4 | 0.40 s | 19.5 KB |
-| `avatar.juno.lv2.swag` | `swag` | `/sprites/juno/lv2/swag.svg` | 48x48 | 15 | 2.85 s | 61.4 KB |
-| `avatar.juno.lv2.cry` | `cry` | `/sprites/juno/lv2/cry.svg` | 48x48 | 12 | 2.04 s | 48.5 KB |
-| `avatar.juno.lv2.caught` | `caught` | `/sprites/juno/lv2/caught.svg` | 48x48 | 8 | 1.20 s | 42.8 KB |
-| `avatar.juno.lv2.saved` | `saved` | `/sprites/juno/lv2/saved.svg` | 48x48 | 8 | 0.88 s | 36.0 KB |
-| `avatar.juno.lv2.alert` | `alert` | `/sprites/juno/lv2/alert.svg` | 48x48 | 8 | 0.88 s | 26.1 KB |
-| `avatar.juno.lv2.hunt` | `hunt` | `/sprites/juno/lv2/hunt.svg` | 48x48 | 8 | 1.36 s | 27.3 KB |
-| `avatar.juno.lv2.locked` | `locked` | `/sprites/juno/lv2/locked.svg` | 48x48 | 1 | Still | 4.0 KB |
+| `avatar.juno.lv2.idle` | `idle` | `/sprites/juno/lv2/idle.svg` | 48x48 | 11 | 3.64 s | 10.8 KB |
+| `avatar.juno.lv2.seated` | `seated` | `/sprites/juno/lv2/seated.svg` | 48x48 | 7 | 3.03 s | 11.3 KB |
+| `avatar.juno.lv2.sneak` | `sneak` | `/sprites/juno/lv2/sneak.svg` | 48x48 | 8 | 1.52 s | 16.1 KB |
+| `avatar.juno.lv2.thief` | `thief` | `/sprites/juno/lv2/thief.svg` | 48x48 | 7 | 1.96 s | 9.4 KB |
+| `avatar.juno.lv2.run` | `run` | `/sprites/juno/lv2/run.svg` | 48x48 | 4 | 0.44 s | 10.7 KB |
+| `avatar.juno.lv2.thief-run` | `thief-run` | `/sprites/juno/lv2/thief-run.svg` | 48x48 | 4 | 0.40 s | 13.2 KB |
+| `avatar.juno.lv2.swag` | `swag` | `/sprites/juno/lv2/swag.svg` | 48x48 | 15 | 2.85 s | 42.4 KB |
+| `avatar.juno.lv2.cry` | `cry` | `/sprites/juno/lv2/cry.svg` | 48x48 | 12 | 2.04 s | 28.6 KB |
+| `avatar.juno.lv2.caught` | `caught` | `/sprites/juno/lv2/caught.svg` | 48x48 | 8 | 1.20 s | 19.2 KB |
+| `avatar.juno.lv2.saved` | `saved` | `/sprites/juno/lv2/saved.svg` | 48x48 | 8 | 0.88 s | 26.2 KB |
+| `avatar.juno.lv2.alert` | `alert` | `/sprites/juno/lv2/alert.svg` | 48x48 | 8 | 0.88 s | 14.6 KB |
+| `avatar.juno.lv2.hunt` | `hunt` | `/sprites/juno/lv2/hunt.svg` | 48x48 | 8 | 1.36 s | 17.6 KB |
+| `avatar.juno.lv2.locked` | `locked` | `/sprites/juno/lv2/locked.svg` | 48x48 | 1 | Still | 2.8 KB |
 
 ## Juno, LV 3 Phantom
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.juno.lv3.idle` | `idle` | `/sprites/juno/lv3/idle.svg` | 48x48 | 11 | 3.64 s | 32.9 KB |
-| `avatar.juno.lv3.seated` | `seated` | `/sprites/juno/lv3/seated.svg` | 48x48 | 7 | 3.03 s | 33.6 KB |
-| `avatar.juno.lv3.sneak` | `sneak` | `/sprites/juno/lv3/sneak.svg` | 48x48 | 8 | 1.52 s | 32.4 KB |
-| `avatar.juno.lv3.thief` | `thief` | `/sprites/juno/lv3/thief.svg` | 48x48 | 7 | 1.96 s | 34.0 KB |
-| `avatar.juno.lv3.run` | `run` | `/sprites/juno/lv3/run.svg` | 48x48 | 4 | 0.44 s | 17.1 KB |
-| `avatar.juno.lv3.thief-run` | `thief-run` | `/sprites/juno/lv3/thief-run.svg` | 48x48 | 4 | 0.40 s | 21.3 KB |
-| `avatar.juno.lv3.swag` | `swag` | `/sprites/juno/lv3/swag.svg` | 48x48 | 15 | 2.85 s | 67.7 KB |
-| `avatar.juno.lv3.cry` | `cry` | `/sprites/juno/lv3/cry.svg` | 48x48 | 12 | 2.04 s | 55.1 KB |
-| `avatar.juno.lv3.caught` | `caught` | `/sprites/juno/lv3/caught.svg` | 48x48 | 8 | 1.20 s | 46.8 KB |
-| `avatar.juno.lv3.saved` | `saved` | `/sprites/juno/lv3/saved.svg` | 48x48 | 8 | 0.88 s | 40.4 KB |
-| `avatar.juno.lv3.alert` | `alert` | `/sprites/juno/lv3/alert.svg` | 48x48 | 8 | 0.88 s | 34.6 KB |
-| `avatar.juno.lv3.hunt` | `hunt` | `/sprites/juno/lv3/hunt.svg` | 48x48 | 8 | 1.36 s | 35.5 KB |
-| `avatar.juno.lv3.locked` | `locked` | `/sprites/juno/lv3/locked.svg` | 48x48 | 1 | Still | 4.3 KB |
+| `avatar.juno.lv3.idle` | `idle` | `/sprites/juno/lv3/idle.svg` | 48x48 | 11 | 3.64 s | 16.8 KB |
+| `avatar.juno.lv3.seated` | `seated` | `/sprites/juno/lv3/seated.svg` | 48x48 | 7 | 3.03 s | 15.6 KB |
+| `avatar.juno.lv3.sneak` | `sneak` | `/sprites/juno/lv3/sneak.svg` | 48x48 | 8 | 1.52 s | 20.5 KB |
+| `avatar.juno.lv3.thief` | `thief` | `/sprites/juno/lv3/thief.svg` | 48x48 | 7 | 1.96 s | 19.4 KB |
+| `avatar.juno.lv3.run` | `run` | `/sprites/juno/lv3/run.svg` | 48x48 | 4 | 0.44 s | 12.0 KB |
+| `avatar.juno.lv3.thief-run` | `thief-run` | `/sprites/juno/lv3/thief-run.svg` | 48x48 | 4 | 0.40 s | 14.5 KB |
+| `avatar.juno.lv3.swag` | `swag` | `/sprites/juno/lv3/swag.svg` | 48x48 | 15 | 2.85 s | 45.2 KB |
+| `avatar.juno.lv3.cry` | `cry` | `/sprites/juno/lv3/cry.svg` | 48x48 | 12 | 2.04 s | 31.4 KB |
+| `avatar.juno.lv3.caught` | `caught` | `/sprites/juno/lv3/caught.svg` | 48x48 | 8 | 1.20 s | 20.5 KB |
+| `avatar.juno.lv3.saved` | `saved` | `/sprites/juno/lv3/saved.svg` | 48x48 | 8 | 0.88 s | 28.2 KB |
+| `avatar.juno.lv3.alert` | `alert` | `/sprites/juno/lv3/alert.svg` | 48x48 | 8 | 0.88 s | 17.7 KB |
+| `avatar.juno.lv3.hunt` | `hunt` | `/sprites/juno/lv3/hunt.svg` | 48x48 | 8 | 1.36 s | 22.6 KB |
+| `avatar.juno.lv3.locked` | `locked` | `/sprites/juno/lv3/locked.svg` | 48x48 | 1 | Still | 2.9 KB |
 
 ## Rocco, LV 1 Rookie
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.rocco.lv1.idle` | `idle` | `/sprites/rocco/lv1/idle.svg` | 48x48 | 11 | 3.64 s | 16.8 KB |
-| `avatar.rocco.lv1.seated` | `seated` | `/sprites/rocco/lv1/seated.svg` | 48x48 | 7 | 3.03 s | 21.1 KB |
-| `avatar.rocco.lv1.sneak` | `sneak` | `/sprites/rocco/lv1/sneak.svg` | 48x48 | 8 | 1.52 s | 21.4 KB |
-| `avatar.rocco.lv1.thief` | `thief` | `/sprites/rocco/lv1/thief.svg` | 48x48 | 7 | 1.96 s | 13.7 KB |
-| `avatar.rocco.lv1.run` | `run` | `/sprites/rocco/lv1/run.svg` | 48x48 | 4 | 0.44 s | 13.3 KB |
-| `avatar.rocco.lv1.thief-run` | `thief-run` | `/sprites/rocco/lv1/thief-run.svg` | 48x48 | 4 | 0.40 s | 18.3 KB |
-| `avatar.rocco.lv1.swag` | `swag` | `/sprites/rocco/lv1/swag.svg` | 48x48 | 15 | 2.85 s | 55.2 KB |
-| `avatar.rocco.lv1.cry` | `cry` | `/sprites/rocco/lv1/cry.svg` | 48x48 | 12 | 2.04 s | 43.9 KB |
-| `avatar.rocco.lv1.caught` | `caught` | `/sprites/rocco/lv1/caught.svg` | 48x48 | 8 | 1.20 s | 39.4 KB |
-| `avatar.rocco.lv1.saved` | `saved` | `/sprites/rocco/lv1/saved.svg` | 48x48 | 8 | 0.88 s | 34.0 KB |
-| `avatar.rocco.lv1.alert` | `alert` | `/sprites/rocco/lv1/alert.svg` | 48x48 | 8 | 0.88 s | 23.9 KB |
-| `avatar.rocco.lv1.hunt` | `hunt` | `/sprites/rocco/lv1/hunt.svg` | 48x48 | 8 | 1.36 s | 24.2 KB |
-| `avatar.rocco.lv1.locked` | `locked` | `/sprites/rocco/lv1/locked.svg` | 48x48 | 1 | Still | 3.6 KB |
+| `avatar.rocco.lv1.idle` | `idle` | `/sprites/rocco/lv1/idle.svg` | 48x48 | 11 | 3.64 s | 8.8 KB |
+| `avatar.rocco.lv1.seated` | `seated` | `/sprites/rocco/lv1/seated.svg` | 48x48 | 7 | 3.03 s | 9.4 KB |
+| `avatar.rocco.lv1.sneak` | `sneak` | `/sprites/rocco/lv1/sneak.svg` | 48x48 | 8 | 1.52 s | 15.3 KB |
+| `avatar.rocco.lv1.thief` | `thief` | `/sprites/rocco/lv1/thief.svg` | 48x48 | 7 | 1.96 s | 8.5 KB |
+| `avatar.rocco.lv1.run` | `run` | `/sprites/rocco/lv1/run.svg` | 48x48 | 4 | 0.44 s | 10.2 KB |
+| `avatar.rocco.lv1.thief-run` | `thief-run` | `/sprites/rocco/lv1/thief-run.svg` | 48x48 | 4 | 0.40 s | 12.7 KB |
+| `avatar.rocco.lv1.swag` | `swag` | `/sprites/rocco/lv1/swag.svg` | 48x48 | 15 | 2.85 s | 39.1 KB |
+| `avatar.rocco.lv1.cry` | `cry` | `/sprites/rocco/lv1/cry.svg` | 48x48 | 12 | 2.04 s | 24.5 KB |
+| `avatar.rocco.lv1.caught` | `caught` | `/sprites/rocco/lv1/caught.svg` | 48x48 | 8 | 1.20 s | 15.8 KB |
+| `avatar.rocco.lv1.saved` | `saved` | `/sprites/rocco/lv1/saved.svg` | 48x48 | 8 | 0.88 s | 26.0 KB |
+| `avatar.rocco.lv1.alert` | `alert` | `/sprites/rocco/lv1/alert.svg` | 48x48 | 8 | 0.88 s | 11.0 KB |
+| `avatar.rocco.lv1.hunt` | `hunt` | `/sprites/rocco/lv1/hunt.svg` | 48x48 | 8 | 1.36 s | 17.0 KB |
+| `avatar.rocco.lv1.locked` | `locked` | `/sprites/rocco/lv1/locked.svg` | 48x48 | 1 | Still | 2.7 KB |
 
 ## Rocco, LV 2 Prowler
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.rocco.lv2.idle` | `idle` | `/sprites/rocco/lv2/idle.svg` | 48x48 | 11 | 3.64 s | 17.5 KB |
-| `avatar.rocco.lv2.seated` | `seated` | `/sprites/rocco/lv2/seated.svg` | 48x48 | 7 | 3.03 s | 21.8 KB |
-| `avatar.rocco.lv2.sneak` | `sneak` | `/sprites/rocco/lv2/sneak.svg` | 48x48 | 8 | 1.52 s | 22.3 KB |
-| `avatar.rocco.lv2.thief` | `thief` | `/sprites/rocco/lv2/thief.svg` | 48x48 | 7 | 1.96 s | 14.2 KB |
-| `avatar.rocco.lv2.run` | `run` | `/sprites/rocco/lv2/run.svg` | 48x48 | 4 | 0.44 s | 13.8 KB |
-| `avatar.rocco.lv2.thief-run` | `thief-run` | `/sprites/rocco/lv2/thief-run.svg` | 48x48 | 4 | 0.40 s | 19.0 KB |
-| `avatar.rocco.lv2.swag` | `swag` | `/sprites/rocco/lv2/swag.svg` | 48x48 | 15 | 2.85 s | 58.9 KB |
-| `avatar.rocco.lv2.cry` | `cry` | `/sprites/rocco/lv2/cry.svg` | 48x48 | 12 | 2.04 s | 45.5 KB |
-| `avatar.rocco.lv2.caught` | `caught` | `/sprites/rocco/lv2/caught.svg` | 48x48 | 8 | 1.20 s | 40.6 KB |
-| `avatar.rocco.lv2.saved` | `saved` | `/sprites/rocco/lv2/saved.svg` | 48x48 | 8 | 0.88 s | 35.1 KB |
-| `avatar.rocco.lv2.alert` | `alert` | `/sprites/rocco/lv2/alert.svg` | 48x48 | 8 | 0.88 s | 24.9 KB |
-| `avatar.rocco.lv2.hunt` | `hunt` | `/sprites/rocco/lv2/hunt.svg` | 48x48 | 8 | 1.36 s | 25.2 KB |
-| `avatar.rocco.lv2.locked` | `locked` | `/sprites/rocco/lv2/locked.svg` | 48x48 | 1 | Still | 3.8 KB |
+| `avatar.rocco.lv2.idle` | `idle` | `/sprites/rocco/lv2/idle.svg` | 48x48 | 11 | 3.64 s | 10.2 KB |
+| `avatar.rocco.lv2.seated` | `seated` | `/sprites/rocco/lv2/seated.svg` | 48x48 | 7 | 3.03 s | 10.8 KB |
+| `avatar.rocco.lv2.sneak` | `sneak` | `/sprites/rocco/lv2/sneak.svg` | 48x48 | 8 | 1.52 s | 16.3 KB |
+| `avatar.rocco.lv2.thief` | `thief` | `/sprites/rocco/lv2/thief.svg` | 48x48 | 7 | 1.96 s | 9.4 KB |
+| `avatar.rocco.lv2.run` | `run` | `/sprites/rocco/lv2/run.svg` | 48x48 | 4 | 0.44 s | 10.8 KB |
+| `avatar.rocco.lv2.thief-run` | `thief-run` | `/sprites/rocco/lv2/thief-run.svg` | 48x48 | 4 | 0.40 s | 13.4 KB |
+| `avatar.rocco.lv2.swag` | `swag` | `/sprites/rocco/lv2/swag.svg` | 48x48 | 15 | 2.85 s | 43.1 KB |
+| `avatar.rocco.lv2.cry` | `cry` | `/sprites/rocco/lv2/cry.svg` | 48x48 | 12 | 2.04 s | 27.5 KB |
+| `avatar.rocco.lv2.caught` | `caught` | `/sprites/rocco/lv2/caught.svg` | 48x48 | 8 | 1.20 s | 17.9 KB |
+| `avatar.rocco.lv2.saved` | `saved` | `/sprites/rocco/lv2/saved.svg` | 48x48 | 8 | 0.88 s | 26.9 KB |
+| `avatar.rocco.lv2.alert` | `alert` | `/sprites/rocco/lv2/alert.svg` | 48x48 | 8 | 0.88 s | 12.3 KB |
+| `avatar.rocco.lv2.hunt` | `hunt` | `/sprites/rocco/lv2/hunt.svg` | 48x48 | 8 | 1.36 s | 18.0 KB |
+| `avatar.rocco.lv2.locked` | `locked` | `/sprites/rocco/lv2/locked.svg` | 48x48 | 1 | Still | 2.8 KB |
 
 ## Rocco, LV 3 Phantom
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.rocco.lv3.idle` | `idle` | `/sprites/rocco/lv3/idle.svg` | 48x48 | 11 | 3.64 s | 33.9 KB |
-| `avatar.rocco.lv3.seated` | `seated` | `/sprites/rocco/lv3/seated.svg` | 48x48 | 7 | 3.03 s | 34.8 KB |
-| `avatar.rocco.lv3.sneak` | `sneak` | `/sprites/rocco/lv3/sneak.svg` | 48x48 | 8 | 1.52 s | 32.8 KB |
-| `avatar.rocco.lv3.thief` | `thief` | `/sprites/rocco/lv3/thief.svg` | 48x48 | 7 | 1.96 s | 37.1 KB |
-| `avatar.rocco.lv3.run` | `run` | `/sprites/rocco/lv3/run.svg` | 48x48 | 4 | 0.44 s | 17.7 KB |
-| `avatar.rocco.lv3.thief-run` | `thief-run` | `/sprites/rocco/lv3/thief-run.svg` | 48x48 | 4 | 0.40 s | 22.5 KB |
-| `avatar.rocco.lv3.swag` | `swag` | `/sprites/rocco/lv3/swag.svg` | 48x48 | 15 | 2.85 s | 68.7 KB |
-| `avatar.rocco.lv3.cry` | `cry` | `/sprites/rocco/lv3/cry.svg` | 48x48 | 12 | 2.04 s | 56.7 KB |
-| `avatar.rocco.lv3.caught` | `caught` | `/sprites/rocco/lv3/caught.svg` | 48x48 | 8 | 1.20 s | 48.3 KB |
-| `avatar.rocco.lv3.saved` | `saved` | `/sprites/rocco/lv3/saved.svg` | 48x48 | 8 | 0.88 s | 42.5 KB |
-| `avatar.rocco.lv3.alert` | `alert` | `/sprites/rocco/lv3/alert.svg` | 48x48 | 8 | 0.88 s | 35.9 KB |
-| `avatar.rocco.lv3.hunt` | `hunt` | `/sprites/rocco/lv3/hunt.svg` | 48x48 | 8 | 1.36 s | 36.4 KB |
-| `avatar.rocco.lv3.locked` | `locked` | `/sprites/rocco/lv3/locked.svg` | 48x48 | 1 | Still | 4.5 KB |
+| `avatar.rocco.lv3.idle` | `idle` | `/sprites/rocco/lv3/idle.svg` | 48x48 | 11 | 3.64 s | 15.7 KB |
+| `avatar.rocco.lv3.seated` | `seated` | `/sprites/rocco/lv3/seated.svg` | 48x48 | 7 | 3.03 s | 14.8 KB |
+| `avatar.rocco.lv3.sneak` | `sneak` | `/sprites/rocco/lv3/sneak.svg` | 48x48 | 8 | 1.52 s | 21.1 KB |
+| `avatar.rocco.lv3.thief` | `thief` | `/sprites/rocco/lv3/thief.svg` | 48x48 | 7 | 1.96 s | 18.8 KB |
+| `avatar.rocco.lv3.run` | `run` | `/sprites/rocco/lv3/run.svg` | 48x48 | 4 | 0.44 s | 12.4 KB |
+| `avatar.rocco.lv3.thief-run` | `thief-run` | `/sprites/rocco/lv3/thief-run.svg` | 48x48 | 4 | 0.40 s | 15.0 KB |
+| `avatar.rocco.lv3.swag` | `swag` | `/sprites/rocco/lv3/swag.svg` | 48x48 | 15 | 2.85 s | 47.7 KB |
+| `avatar.rocco.lv3.cry` | `cry` | `/sprites/rocco/lv3/cry.svg` | 48x48 | 12 | 2.04 s | 30.1 KB |
+| `avatar.rocco.lv3.caught` | `caught` | `/sprites/rocco/lv3/caught.svg` | 48x48 | 8 | 1.20 s | 19.7 KB |
+| `avatar.rocco.lv3.saved` | `saved` | `/sprites/rocco/lv3/saved.svg` | 48x48 | 8 | 0.88 s | 30.1 KB |
+| `avatar.rocco.lv3.alert` | `alert` | `/sprites/rocco/lv3/alert.svg` | 48x48 | 8 | 0.88 s | 15.7 KB |
+| `avatar.rocco.lv3.hunt` | `hunt` | `/sprites/rocco/lv3/hunt.svg` | 48x48 | 8 | 1.36 s | 23.1 KB |
+| `avatar.rocco.lv3.locked` | `locked` | `/sprites/rocco/lv3/locked.svg` | 48x48 | 1 | Still | 3.1 KB |
 
 ## Nib, LV 1 Rookie
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.nib.lv1.idle` | `idle` | `/sprites/nib/lv1/idle.svg` | 48x48 | 11 | 3.64 s | 17.3 KB |
-| `avatar.nib.lv1.seated` | `seated` | `/sprites/nib/lv1/seated.svg` | 48x48 | 7 | 3.03 s | 21.6 KB |
-| `avatar.nib.lv1.sneak` | `sneak` | `/sprites/nib/lv1/sneak.svg` | 48x48 | 8 | 1.52 s | 22.3 KB |
-| `avatar.nib.lv1.thief` | `thief` | `/sprites/nib/lv1/thief.svg` | 48x48 | 7 | 1.96 s | 13.9 KB |
-| `avatar.nib.lv1.run` | `run` | `/sprites/nib/lv1/run.svg` | 48x48 | 4 | 0.44 s | 13.8 KB |
-| `avatar.nib.lv1.thief-run` | `thief-run` | `/sprites/nib/lv1/thief-run.svg` | 48x48 | 4 | 0.40 s | 18.8 KB |
-| `avatar.nib.lv1.swag` | `swag` | `/sprites/nib/lv1/swag.svg` | 48x48 | 15 | 2.85 s | 57.4 KB |
-| `avatar.nib.lv1.cry` | `cry` | `/sprites/nib/lv1/cry.svg` | 48x48 | 12 | 2.04 s | 45.0 KB |
-| `avatar.nib.lv1.caught` | `caught` | `/sprites/nib/lv1/caught.svg` | 48x48 | 8 | 1.20 s | 38.9 KB |
-| `avatar.nib.lv1.saved` | `saved` | `/sprites/nib/lv1/saved.svg` | 48x48 | 8 | 0.88 s | 34.7 KB |
-| `avatar.nib.lv1.alert` | `alert` | `/sprites/nib/lv1/alert.svg` | 48x48 | 8 | 0.88 s | 25.0 KB |
-| `avatar.nib.lv1.hunt` | `hunt` | `/sprites/nib/lv1/hunt.svg` | 48x48 | 8 | 1.36 s | 25.5 KB |
-| `avatar.nib.lv1.locked` | `locked` | `/sprites/nib/lv1/locked.svg` | 48x48 | 1 | Still | 3.7 KB |
+| `avatar.nib.lv1.idle` | `idle` | `/sprites/nib/lv1/idle.svg` | 48x48 | 11 | 3.64 s | 10.0 KB |
+| `avatar.nib.lv1.seated` | `seated` | `/sprites/nib/lv1/seated.svg` | 48x48 | 7 | 3.03 s | 10.5 KB |
+| `avatar.nib.lv1.sneak` | `sneak` | `/sprites/nib/lv1/sneak.svg` | 48x48 | 8 | 1.52 s | 15.9 KB |
+| `avatar.nib.lv1.thief` | `thief` | `/sprites/nib/lv1/thief.svg` | 48x48 | 7 | 1.96 s | 9.1 KB |
+| `avatar.nib.lv1.run` | `run` | `/sprites/nib/lv1/run.svg` | 48x48 | 4 | 0.44 s | 10.3 KB |
+| `avatar.nib.lv1.thief-run` | `thief-run` | `/sprites/nib/lv1/thief-run.svg` | 48x48 | 4 | 0.40 s | 13.0 KB |
+| `avatar.nib.lv1.swag` | `swag` | `/sprites/nib/lv1/swag.svg` | 48x48 | 15 | 2.85 s | 40.8 KB |
+| `avatar.nib.lv1.cry` | `cry` | `/sprites/nib/lv1/cry.svg` | 48x48 | 12 | 2.04 s | 27.2 KB |
+| `avatar.nib.lv1.caught` | `caught` | `/sprites/nib/lv1/caught.svg` | 48x48 | 8 | 1.20 s | 17.7 KB |
+| `avatar.nib.lv1.saved` | `saved` | `/sprites/nib/lv1/saved.svg` | 48x48 | 8 | 0.88 s | 26.0 KB |
+| `avatar.nib.lv1.alert` | `alert` | `/sprites/nib/lv1/alert.svg` | 48x48 | 8 | 0.88 s | 13.1 KB |
+| `avatar.nib.lv1.hunt` | `hunt` | `/sprites/nib/lv1/hunt.svg` | 48x48 | 8 | 1.36 s | 18.0 KB |
+| `avatar.nib.lv1.locked` | `locked` | `/sprites/nib/lv1/locked.svg` | 48x48 | 1 | Still | 2.7 KB |
 
 ## Nib, LV 2 Prowler
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.nib.lv2.idle` | `idle` | `/sprites/nib/lv2/idle.svg` | 48x48 | 11 | 3.64 s | 20.1 KB |
-| `avatar.nib.lv2.seated` | `seated` | `/sprites/nib/lv2/seated.svg` | 48x48 | 7 | 3.03 s | 23.3 KB |
-| `avatar.nib.lv2.sneak` | `sneak` | `/sprites/nib/lv2/sneak.svg` | 48x48 | 8 | 1.52 s | 26.1 KB |
-| `avatar.nib.lv2.thief` | `thief` | `/sprites/nib/lv2/thief.svg` | 48x48 | 7 | 1.96 s | 15.5 KB |
-| `avatar.nib.lv2.run` | `run` | `/sprites/nib/lv2/run.svg` | 48x48 | 4 | 0.44 s | 15.9 KB |
-| `avatar.nib.lv2.thief-run` | `thief-run` | `/sprites/nib/lv2/thief-run.svg` | 48x48 | 4 | 0.40 s | 20.8 KB |
-| `avatar.nib.lv2.swag` | `swag` | `/sprites/nib/lv2/swag.svg` | 48x48 | 15 | 2.85 s | 66.2 KB |
-| `avatar.nib.lv2.cry` | `cry` | `/sprites/nib/lv2/cry.svg` | 48x48 | 12 | 2.04 s | 51.3 KB |
-| `avatar.nib.lv2.caught` | `caught` | `/sprites/nib/lv2/caught.svg` | 48x48 | 8 | 1.20 s | 41.9 KB |
-| `avatar.nib.lv2.saved` | `saved` | `/sprites/nib/lv2/saved.svg` | 48x48 | 8 | 0.88 s | 38.3 KB |
-| `avatar.nib.lv2.alert` | `alert` | `/sprites/nib/lv2/alert.svg` | 48x48 | 8 | 0.88 s | 27.7 KB |
-| `avatar.nib.lv2.hunt` | `hunt` | `/sprites/nib/lv2/hunt.svg` | 48x48 | 8 | 1.36 s | 27.7 KB |
-| `avatar.nib.lv2.locked` | `locked` | `/sprites/nib/lv2/locked.svg` | 48x48 | 1 | Still | 4.3 KB |
+| `avatar.nib.lv2.idle` | `idle` | `/sprites/nib/lv2/idle.svg` | 48x48 | 11 | 3.64 s | 10.6 KB |
+| `avatar.nib.lv2.seated` | `seated` | `/sprites/nib/lv2/seated.svg` | 48x48 | 7 | 3.03 s | 11.2 KB |
+| `avatar.nib.lv2.sneak` | `sneak` | `/sprites/nib/lv2/sneak.svg` | 48x48 | 8 | 1.52 s | 19.3 KB |
+| `avatar.nib.lv2.thief` | `thief` | `/sprites/nib/lv2/thief.svg` | 48x48 | 7 | 1.96 s | 9.6 KB |
+| `avatar.nib.lv2.run` | `run` | `/sprites/nib/lv2/run.svg` | 48x48 | 4 | 0.44 s | 12.5 KB |
+| `avatar.nib.lv2.thief-run` | `thief-run` | `/sprites/nib/lv2/thief-run.svg` | 48x48 | 4 | 0.40 s | 15.0 KB |
+| `avatar.nib.lv2.swag` | `swag` | `/sprites/nib/lv2/swag.svg` | 48x48 | 15 | 2.85 s | 48.0 KB |
+| `avatar.nib.lv2.cry` | `cry` | `/sprites/nib/lv2/cry.svg` | 48x48 | 12 | 2.04 s | 30.3 KB |
+| `avatar.nib.lv2.caught` | `caught` | `/sprites/nib/lv2/caught.svg` | 48x48 | 8 | 1.20 s | 18.2 KB |
+| `avatar.nib.lv2.saved` | `saved` | `/sprites/nib/lv2/saved.svg` | 48x48 | 8 | 0.88 s | 29.9 KB |
+| `avatar.nib.lv2.alert` | `alert` | `/sprites/nib/lv2/alert.svg` | 48x48 | 8 | 0.88 s | 13.6 KB |
+| `avatar.nib.lv2.hunt` | `hunt` | `/sprites/nib/lv2/hunt.svg` | 48x48 | 8 | 1.36 s | 20.4 KB |
+| `avatar.nib.lv2.locked` | `locked` | `/sprites/nib/lv2/locked.svg` | 48x48 | 1 | Still | 3.2 KB |
 
 ## Nib, LV 3 Phantom
 
 | Asset ID | State | Path | Size | Frames | Cycle | File size |
 | --- | --- | --- | --- | --- | --- | --- |
-| `avatar.nib.lv3.idle` | `idle` | `/sprites/nib/lv3/idle.svg` | 48x48 | 11 | 3.64 s | 37.4 KB |
-| `avatar.nib.lv3.seated` | `seated` | `/sprites/nib/lv3/seated.svg` | 48x48 | 7 | 3.03 s | 37.6 KB |
-| `avatar.nib.lv3.sneak` | `sneak` | `/sprites/nib/lv3/sneak.svg` | 48x48 | 8 | 1.52 s | 36.1 KB |
-| `avatar.nib.lv3.thief` | `thief` | `/sprites/nib/lv3/thief.svg` | 48x48 | 7 | 1.96 s | 39.2 KB |
-| `avatar.nib.lv3.run` | `run` | `/sprites/nib/lv3/run.svg` | 48x48 | 4 | 0.44 s | 19.2 KB |
-| `avatar.nib.lv3.thief-run` | `thief-run` | `/sprites/nib/lv3/thief-run.svg` | 48x48 | 4 | 0.40 s | 23.4 KB |
-| `avatar.nib.lv3.swag` | `swag` | `/sprites/nib/lv3/swag.svg` | 48x48 | 15 | 2.85 s | 75.0 KB |
-| `avatar.nib.lv3.cry` | `cry` | `/sprites/nib/lv3/cry.svg` | 48x48 | 12 | 2.04 s | 61.6 KB |
-| `avatar.nib.lv3.caught` | `caught` | `/sprites/nib/lv3/caught.svg` | 48x48 | 8 | 1.20 s | 47.4 KB |
-| `avatar.nib.lv3.saved` | `saved` | `/sprites/nib/lv3/saved.svg` | 48x48 | 8 | 0.88 s | 43.2 KB |
-| `avatar.nib.lv3.alert` | `alert` | `/sprites/nib/lv3/alert.svg` | 48x48 | 8 | 0.88 s | 37.4 KB |
-| `avatar.nib.lv3.hunt` | `hunt` | `/sprites/nib/lv3/hunt.svg` | 48x48 | 8 | 1.36 s | 38.7 KB |
-| `avatar.nib.lv3.locked` | `locked` | `/sprites/nib/lv3/locked.svg` | 48x48 | 1 | Still | 5.0 KB |
+| `avatar.nib.lv3.idle` | `idle` | `/sprites/nib/lv3/idle.svg` | 48x48 | 11 | 3.64 s | 18.0 KB |
+| `avatar.nib.lv3.seated` | `seated` | `/sprites/nib/lv3/seated.svg` | 48x48 | 7 | 3.03 s | 16.9 KB |
+| `avatar.nib.lv3.sneak` | `sneak` | `/sprites/nib/lv3/sneak.svg` | 48x48 | 8 | 1.52 s | 26.8 KB |
+| `avatar.nib.lv3.thief` | `thief` | `/sprites/nib/lv3/thief.svg` | 48x48 | 7 | 1.96 s | 20.8 KB |
+| `avatar.nib.lv3.run` | `run` | `/sprites/nib/lv3/run.svg` | 48x48 | 4 | 0.44 s | 15.0 KB |
+| `avatar.nib.lv3.thief-run` | `thief-run` | `/sprites/nib/lv3/thief-run.svg` | 48x48 | 4 | 0.40 s | 17.3 KB |
+| `avatar.nib.lv3.swag` | `swag` | `/sprites/nib/lv3/swag.svg` | 48x48 | 15 | 2.85 s | 54.7 KB |
+| `avatar.nib.lv3.cry` | `cry` | `/sprites/nib/lv3/cry.svg` | 48x48 | 12 | 2.04 s | 35.9 KB |
+| `avatar.nib.lv3.caught` | `caught` | `/sprites/nib/lv3/caught.svg` | 48x48 | 8 | 1.20 s | 21.3 KB |
+| `avatar.nib.lv3.saved` | `saved` | `/sprites/nib/lv3/saved.svg` | 48x48 | 8 | 0.88 s | 34.0 KB |
+| `avatar.nib.lv3.alert` | `alert` | `/sprites/nib/lv3/alert.svg` | 48x48 | 8 | 0.88 s | 18.2 KB |
+| `avatar.nib.lv3.hunt` | `hunt` | `/sprites/nib/lv3/hunt.svg` | 48x48 | 8 | 1.36 s | 28.7 KB |
+| `avatar.nib.lv3.locked` | `locked` | `/sprites/nib/lv3/locked.svg` | 48x48 | 1 | Still | 3.7 KB |
 
 ## Scenes
 
 | Asset ID | What it is | Path | Size | Frames | Cycle | File size | Used on |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `scene.room` | Static layer: wood floor and red rug | `/sprites/scenes/room.svg` | 240x172 | 1 | Still | 36.8 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
-| `scene.table` | Static layer: round table, drawn over the back seats | `/sprites/scenes/table.svg` | 240x172 | 1 | Still | 8.5 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
-| `scene.wall-tile` | Static tile: brick wall with lamp, scrolled sideways | `/sprites/scenes/wall-tile.svg` | 56x58 | 1 | Still | 5.1 KB | `screen.title`, `screen.round`, `heist.headstart`, `heist.hunted` |
-| `scene.floor-tile` | Static tile: wood floor, scrolled sideways | `/sprites/scenes/floor-tile.svg` | 56x54 | 1 | Still | 3.2 KB | `screen.title`, `screen.round`, `heist.headstart`, `heist.hunted` |
-| `scene.radar` | Animated radar sweep | `/sprites/scenes/radar.svg` | 97x97 | 16 | 1.60 s | 37.8 KB | `screen.scan`, `heist.hunting`, `heist.handshake` |
-| `scene.table-idle` | Complete scene with a fixed cast, for previews | `/sprites/scenes/table-idle.svg` | 240x172 | 80 | 8.00 s | 235.0 KB | Not used by the app UI |
-| `scene.heist-thief-view` | Complete scene with a fixed cast: Rocco robs Juno, for previews | `/sprites/scenes/heist-thief-view.svg` | 240x172 | 124 | 12.40 s | 360.9 KB | Not used by the app UI |
-| `scene.run-all` | Complete scene with a fixed cast: everyone runs, for previews | `/sprites/scenes/run-all.svg` | 240x112 | 56 | 5.60 s | 150.8 KB | Not used by the app UI |
+| `scene.room` | Static layer: wood floor and red rug | `/sprites/scenes/room.svg` | 240x172 | 1 | Still | 13.4 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
+| `scene.table` | Static layer: round table, drawn over the back seats | `/sprites/scenes/table.svg` | 240x172 | 1 | Still | 7.0 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
+| `scene.wall-tile` | Static tile: brick wall with lamp, scrolled sideways | `/sprites/scenes/wall-tile.svg` | 56x58 | 1 | Still | 1.7 KB | `screen.title`, `screen.round`, `heist.headstart`, `heist.hunted`, `heist.alarm` |
+| `scene.floor-tile` | Static tile: wood floor, scrolled sideways | `/sprites/scenes/floor-tile.svg` | 56x54 | 1 | Still | 0.7 KB | `screen.title`, `screen.round`, `heist.headstart`, `heist.hunted`, `heist.alarm` |
+| `scene.radar` | Animated radar sweep | `/sprites/scenes/radar.svg` | 97x97 | 16 | 1.60 s | 23.5 KB | `screen.scan`, `heist.hunting`, `heist.handshake` |
+| `scene.table-idle` | Complete scene with a fixed cast, for previews | `/sprites/scenes/table-idle.svg` | 240x172 | 80 | 8.00 s | 156.0 KB | Not used by the app UI |
+| `scene.heist-thief-view` | Complete scene with a fixed cast: Rocco robs Juno, for previews | `/sprites/scenes/heist-thief-view.svg` | 240x172 | 124 | 12.40 s | 269.2 KB | Not used by the app UI |
+| `scene.run-all` | Complete scene with a fixed cast: everyone runs, for previews | `/sprites/scenes/run-all.svg` | 240x112 | 56 | 5.60 s | 97.5 KB | Not used by the app UI |
 
 ## Props and logo
 
 | Asset ID | What it is | Path | Size | Frames | Cycle | File size | Used on |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `logo` | Animated Sonic Heist wordmark | `/sprites/logo.svg` | 44x24 | 10 | 1.10 s | 31.5 KB | `screen.title` |
-| `prop.chair` | Empty chair with shadow | `/sprites/props/chair.svg` | 48x48 | 1 | Still | 1.4 KB | `heist.ticket`, `heist.grab`, `heist.disguise` |
+| `logo` | Animated Sonic Heist wordmark | `/sprites/logo.svg` | 44x24 | 10 | 1.10 s | 12.7 KB | `screen.title` |
+| `prop.chair` | Empty chair with shadow | `/sprites/props/chair.svg` | 48x48 | 1 | Still | 0.7 KB | `heist.ticket`, `heist.grab`, `heist.disguise` |
 | `prop.stack-0` | Empty coin stack | `/sprites/props/stack-0.svg` | 13x16 | 1 | Still | 0.1 KB | Not used by the app UI |
-| `prop.stack-1` | Coin stack, 1 high | `/sprites/props/stack-1.svg` | 13x16 | 1 | Still | 0.4 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
+| `prop.stack-1` | Coin stack, 1 high | `/sprites/props/stack-1.svg` | 13x16 | 1 | Still | 0.3 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
 | `prop.stack-2` | Coin stack, 2 high | `/sprites/props/stack-2.svg` | 13x16 | 1 | Still | 0.4 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
-| `prop.stack-3` | Coin stack, 3 high | `/sprites/props/stack-3.svg` | 13x16 | 1 | Still | 0.5 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
-| `prop.stack-4` | Coin stack, 4 high | `/sprites/props/stack-4.svg` | 13x16 | 1 | Still | 0.5 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
+| `prop.stack-3` | Coin stack, 3 high | `/sprites/props/stack-3.svg` | 13x16 | 1 | Still | 0.4 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
+| `prop.stack-4` | Coin stack, 4 high | `/sprites/props/stack-4.svg` | 13x16 | 1 | Still | 0.4 KB | `screen.table`, `heist.ticket`, `heist.grab`, `heist.disguise` |
 
 ## Sounds
 
@@ -249,8 +249,8 @@ Every button also plays `sfx.ui-click` unless a sound is listed for it on the sc
 
 | Asset ID | What it is | Path | Length | Loops | File size | Used on |
 | --- | --- | --- | --- | --- | --- | --- |
-| `sfx.footsteps-loop` | Feet only. Matches the run sprite cycle | `/sfx/footsteps-loop.wav` | 0.44 s | Yes | 9.5 KB | `screen.round`, `heist.headstart`, `heist.hunted` |
-| `sfx.run-loop` | Chase theme for the group run | `/sfx/run-loop.wav` | 2.88 s | Yes | 62.1 KB | `screen.round`, `heist.headstart`, `heist.hunted` |
+| `sfx.footsteps-loop` | Feet only. Matches the run sprite cycle | `/sfx/footsteps-loop.wav` | 0.44 s | Yes | 9.5 KB | `screen.round`, `heist.headstart`, `heist.hunted`, `heist.alarm` |
+| `sfx.run-loop` | Chase theme for the group run | `/sfx/run-loop.wav` | 2.88 s | Yes | 62.1 KB | `screen.round`, `heist.headstart`, `heist.hunted`, `heist.alarm` |
 | `sfx.sneak-loop` | Tiptoe pluck. Matches the sneak sprite cycle | `/sfx/sneak-loop.wav` | 1.52 s | Yes | 32.8 KB | `screen.scan`, `heist.ticket` |
 | `sfx.dash` | Whoosh as the thief takes off | `/sfx/dash.wav` | 0.46 s | No | 9.9 KB | `heist.headstart` |
 | `sfx.heist-start` | Sting when the loot lands on-chain | `/sfx/heist-start.wav` | 0.8 s | No | 17.3 KB | `screen.scan` |
@@ -273,11 +273,11 @@ Every button also plays `sfx.ui-click` unless a sound is listed for it on the sc
 
 | Asset ID | What it is | Path | Length | Loops | File size | Used on |
 | --- | --- | --- | --- | --- | --- | --- |
-| `sfx.alert` | Two-tone siren: you have been robbed. Matches the alert sprite cycle | `/sfx/alert.wav` | 0.88 s | Yes | 19.0 KB | `heist.alert` |
-| `sfx.bang` | The red "!" popping up | `/sfx/bang.wav` | 0.32 s | No | 6.9 KB | `heist.hunted`, `heist.caught`, `heist.hunting` |
+| `sfx.alert` | Two-tone siren: you have been robbed. Matches the alert sprite cycle | `/sfx/alert.wav` | 0.88 s | Yes | 19.0 KB | `heist.headstart`, `heist.alarm`, `heist.alert` |
+| `sfx.bang` | The red "!" popping up | `/sfx/bang.wav` | 0.32 s | No | 6.9 KB | `heist.caught`, `heist.hunting` |
 | `sfx.robbed` | Reveal sting before the hunt starts | `/sfx/robbed.wav` | 1.1 s | No | 23.7 KB | `heist.alert` |
 | `sfx.tick` | Countdown tick | `/sfx/tick.wav` | 0.06 s | No | 1.3 KB | Not used by the app UI |
-| `sfx.tick-urgent` | Countdown tick for the final seconds | `/sfx/tick-urgent.wav` | 0.13 s | No | 2.8 KB | `heist.hunted`, `heist.hunting`, `heist.handshake` |
+| `sfx.tick-urgent` | Countdown tick for the final seconds | `/sfx/tick-urgent.wav` | 0.13 s | No | 2.8 KB | `heist.hunted`, `heist.alarm`, `heist.hunting`, `heist.handshake` |
 | `sfx.radar-ping` | Sonar blip with two echoes | `/sfx/radar-ping.wav` | 0.5 s | No | 10.8 KB | `screen.setup`, `screen.table`, `screen.scan`, `heist.hunting` |
 | `sfx.thief-near` | Thief in range: hot signal | `/sfx/thief-near.wav` | 0.22 s | No | 4.8 KB | `heist.hunting` |
 
@@ -290,7 +290,13 @@ Every button also plays `sfx.ui-click` unless a sound is listed for it on the sc
 | `sfx.level-up` | Avatar reached a new level | `/sfx/level-up.wav` | 1.05 s | No | 22.7 KB | `overlay.level-up` |
 | `sfx.ui-click` | Button press | `/sfx/ui-click.wav` | 0.05 s | No | 1.1 KB | Every button |
 | `sfx.ui-deny` | Not allowed: cooldown, immune, locked | `/sfx/ui-deny.wav` | 0.26 s | No | 5.6 KB | `screen.table`, `screen.scan`, `heist.ticket`, `overlay.notice` |
-| `sfx.shield-on` | Shield mode turned on | `/sfx/shield-on.wav` | 0.5 s | No | 10.8 KB | `screen.table` |
+| `sfx.shield-on` | Shield mode turned on | `/sfx/shield-on.wav` | 0.5 s | No | 10.8 KB | `screen.table`, `overlay.notice` |
+
+## Font
+
+| Asset ID | What it is | Path | File size | Licence | Used on |
+| --- | --- | --- | --- | --- | --- |
+| `font.jersey-15` | Jersey 15, Latin characters | `/fonts/jersey15-latin.woff2` | 5.5 KB | SIL Open Font License 1.1, in `/fonts/Jersey15-OFL.txt` | Every screen |
 
 ## Preview pages
 
