@@ -1,4 +1,4 @@
-# Sonic Heist download site
+# steal-eth download site
 
 A one-page Vite site where players download the Android APK. It uses the game's own design: `pixel.css`, Jersey 15 and the same sprites.
 
@@ -18,13 +18,13 @@ npm run build    # static site in dist/, host anywhere (Vercel, Netlify, GitHub 
 
 ## Adding the APK
 
-The download button links to `/sonic-heist.apk`. The APK isn't committed to git.
+The download button links to `/steal-eth.apk`. The APK is committed here so Vercel can serve it, because the repo is private.
 
-1. Build it from `app/` (needs `npx expo login` or `EXPO_TOKEN`):
+1. On the `main` branch, build it from `app/`:
    ```
-   npx eas-cli@latest build -p android --profile apk
+   powershell -File scripts/build-apk.ps1 -JavaHome <JDK 17 or newer>
    ```
-2. Download the `.apk` from the link EAS prints, and save it as `apps/site/public/sonic-heist.apk`.
-3. Run `npm run build`. The APK is copied into `dist/`.
+2. Download the `.apk` from the link EAS prints, and save it as `apps/site/public/steal-eth.apk`.
+3. Commit and push. Vercel redeploys `steal-eth.xyz`, and the button serves the new APK.
 
 To host the APK elsewhere (for example a GitHub Release), change the button's `href` in `index.html`.

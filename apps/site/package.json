@@ -1,5 +1,5 @@
 {
-  "name": "sonic-heist-site",
+  "name": "steal-eth-site",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
