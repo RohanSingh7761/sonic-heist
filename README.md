@@ -1,13 +1,54 @@
-# Sonic Heist
+<div align="center">
 
-**A real-world thief game played over ultrasound.** Every player is a thief with a vault of test ETH. Walk up to someone, ping them with an inaudible sound, and loot a slice of their vault. They get a short head start to run before the victim is alerted, and then the victim has one minute to physically find you and cancel the heist. Fail to find the thief and the loot is transferred on-chain.
+# steal-eth
 
-> Working title. "Sonic Heist" and the contract name `HeistVault` are placeholders.
+### Rob your friends for fun, then run.
 
-- Platform: Android (React Native), distributed as a sideloaded APK
-- Chain: an EVM L2 testnet with ~2 s blocks (default: Base Sepolia)
-- Backend: **none**. The phones, one smart contract and an RPC endpoint are all that is required
-- Status: design document and build plan (the ultrasound payload transfer has already been validated with a mock payload; no on-chain transaction has been sent yet)
+**A real-world thief game played over ultrasound.** Walk up to someone, ping their phone with a sound they can't hear, and grab a slice of their stake. Then get out of earshot before they find you.
+
+[**Download for Android**](apps/site/public/steal-eth.apk) &nbsp;·&nbsp; [Website](https://steal-eth.xyz) &nbsp;·&nbsp; [Game rules](#2-game-rules) &nbsp;·&nbsp; [Design spec](#table-of-contents)
+
+<img src="docs/images/site-hero.png" alt="The steal-eth website: pixel-art hero with a live phone showing the radar scan" width="860">
+
+</div>
+
+> Working title: "Sonic Heist" and the contract name `HeistVault` are older names for the same project.
+
+---
+
+## See it in the game
+
+| Scan | Sneak | Run |
+|:---:|:---:|:---:|
+| <img src="apps/site/public/screens/scan.png" width="230" alt="Radar listing nearby players"> | <img src="apps/site/public/screens/sneak.png" width="230" alt="Sneaking up on a target"> | <img src="apps/site/public/screens/run.png" width="230" alt="Head-start run timer"> |
+| Ping the room and see who is close. You can't see anyone's stake. | Pick a victim and grab the loot. | You get a 10 s head start. Get away. |
+
+| Robbed | Hunt | Saved |
+|:---:|:---:|:---:|
+| <img src="apps/site/public/screens/alert.png" width="230" alt="You were robbed alert"> | <img src="apps/site/public/screens/hunt.png" width="230" alt="Hunting the thief on the radar"> | <img src="apps/site/public/screens/saved.png" width="230" alt="Heist cancelled, stake returned"> |
+| The victim's phone buzzes. 60 s on the clock. | Follow the signal until the thief shows up red. | Catch them and get the loot plus their bond back. |
+
+## How it works
+
+1. **Ping.** Phones in patrol mode listen for ultrasound (above ~18 kHz). The thief's ping makes nearby phones answer.
+2. **Loot.** The victim's phone auto-signs a one-time consent ticket. The contract moves 5% to 25% of their vault into escrow.
+3. **Run.** The thief has 10 seconds before the victim is told.
+4. **Hunt.** The victim has 60 seconds to get within ultrasound range and cancel. Cancel returns the loot plus the thief's bond. Miss the window and the thief keeps the loot.
+
+## What's in this repo
+
+| Path | What |
+|---|---|
+| `app/` | The Android app (Expo / React Native) with the native ultrasound module (`ggwave` over JNI) |
+| `apps/web/` | Browser build of the game UI, used to develop and demo the screens |
+| `apps/site/` | The [steal-eth.xyz](https://steal-eth.xyz) download site (Vite) |
+| `contracts/` | `HeistVault` Solidity contract (Foundry) |
+| `backend/` | Small Express + Postgres service for accounts and wallets |
+| `docs/` | Protocol test vectors, asset and screen lists |
+
+- Platform: Android, sideloaded APK
+- Chain: EVM L2 testnet (default Base Sepolia), test ETH only
+- The rest of this document is the design spec the game was built from.
 
 ---
 
@@ -745,30 +786,16 @@ Because the handshake and the cancel transaction take around 15 seconds in total
 
 ```
 sonic-heist/
-├── README.md
-├── contracts/                    # Foundry project
-│   ├── src/HeistVault.sol
-│   ├── test/HeistVault.t.sol
-│   ├── script/Deploy.s.sol
-│   └── foundry.toml
-├── app/                          # React Native app
-│   ├── android/                  # Gradle project, foreground service, JNI audio module
-│   │   └── app/src/main/
-│   │       ├── java/.../audio/   # Kotlin: service, AudioRecord/AudioTrack, bridge
-│   │       └── cpp/              # ggwave + JNI glue
-│   └── src/
-│       ├── audio/                # TS wrapper around the native module
-│       ├── protocol/             # message codecs, EIP-712 types, compact signatures
-│       ├── chain/                # viem clients, ABI, event watcher, tx helpers, chain clock
-│       ├── game/                 # thief and victim state machines, auto-sign policy
-│       ├── storage/              # keychain, local DB, settings
-│       ├── ui/                   # screens and components
-│       └── config.ts             # RPC URL, chain ID, contract address
-├── scripts/
-│   ├── fund-players.ts           # send gas ETH to a list of addresses
-│   └── simulate-heist.ts         # run the whole flow with two keys, no audio
-└── docs/
-    └── protocol-fixtures.json    # test vectors shared by app and tests
+├── app/                  # Expo / React Native Android app
+│   ├── modules/sonic-audio/   # Kotlin + C++/JNI ggwave module, patrol foreground service
+│   └── src/              # protocol, chain, game logic, UI screens
+├── apps/
+│   ├── web/              # browser build of the game UI
+│   └── site/             # download site
+├── backend/              # Express + Postgres (accounts, wallets)
+├── contracts/            # Foundry project (HeistVault.sol)
+├── scripts/              # asset generators, simulate-heist.ts, UI tests
+└── docs/                 # protocol fixtures, asset and screen lists
 ```
 
 ---
@@ -813,7 +840,7 @@ Set these in `app/src/config.ts` (or an `.env` file read at build time):
 ```bash
 cd app
 npm install
-npx react-native run-android          # debug build on a connected phone
+npx expo run:android                  # debug build on a connected phone
 
 # release
 cd android
